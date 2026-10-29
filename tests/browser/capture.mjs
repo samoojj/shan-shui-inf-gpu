@@ -6,8 +6,8 @@ export const captureScenarios = [
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
       t.renderer.render({ seed: 'captured-scene', width: 192, height: 144 });
-      const expected = t.pixels();
-      // Let the non-preserved framebuffer pass through presentation before capture.
+      const expected = await t.pixels();
+      // Capture must redraw the requested scene after presentation has occurred.
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const pending = t.renderer.capture();
       t.renderer.render({ seed: 'newer-scene', width: 160, height: 100 });
@@ -20,8 +20,7 @@ export const captureScenarios = [
       t.require(decoded.width === frame.width && decoded.height === frame.height, 'PNG dimensions disagree with capture metadata');
       let difference = 0;
       for (let y = 0; y < frame.height; y++) for (let x = 0; x < frame.width; x++) for (let c = 0; c < 4; c++) {
-        // WebGL readPixels starts at the bottom; decoded PNG pixels start at the top.
-        difference += Math.abs(expected[((frame.height - y - 1) * frame.width + x) * 4 + c]
+        difference += Math.abs(expected[(y * frame.width + x) * 4 + c]
           - decoded.pixels[(y * frame.width + x) * 4 + c]);
       }
       t.require(difference / expected.length < 0.1, `Captured PNG does not represent the requested scene: mean byte difference ${difference / expected.length}`);
@@ -53,7 +52,8 @@ export const captureScenarios = [
     }),
   },
   {
-    name: 'capture reports lost contexts and failed PNG encoding through rejected promises',
+    name: 'capture reports native device loss and failed PNG encoding through rejected promises',
+    observeGPU: true,
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
       const original = t.canvas.toBlob;
@@ -64,17 +64,69 @@ export const captureScenarios = [
         t.require(rejected, 'A null encoding result must reject capture');
         t.require(t.renderer.getStatus() === 'ready', 'An encoding failure must not poison the renderer');
       } finally { t.canvas.toBlob = original; }
-      const gl = t.canvas.getContext('webgl2');
-      const extension = gl.getExtension('WEBGL_lose_context');
-      t.require(!!extension, 'Context-loss test requires WEBGL_lose_context');
-      const lost = new Promise(resolve => t.canvas.addEventListener('webglcontextlost', resolve, { once: true }));
-      extension.loseContext();
+      const device = t.gpu.devices.at(-1);
+      t.require(!!device, 'Device-loss test requires the renderer’s native GPUDevice');
+      const lost = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Renderer did not report native device loss')), 10000);
+        let unsubscribe = () => {};
+        unsubscribe = t.renderer.subscribe(state => {
+          if (state.status !== 'device-lost') return;
+          clearTimeout(timer); unsubscribe(); resolve();
+        });
+      });
+      device.destroy();
       await lost;
       const before = JSON.stringify(t.renderer.getOptions());
       let rejected = false;
       try { await t.renderer.capture({ seed: 'must-not-apply' }); } catch { rejected = true; }
-      t.require(rejected, 'A lost context must reject capture');
+      t.require(rejected, 'A lost device must reject capture');
       t.require(JSON.stringify(t.renderer.getOptions()) === before, 'A rejected capture changed the lost scene');
+    }),
+  },
+  {
+    name: 'capture rejects an asynchronous native draw failure even when PNG encoding succeeds',
+    observeGPU: true,
+    expectedGPUErrors: [/Deliberate capture draw failure/],
+    run: ({ page }) => page.evaluate(async () => {
+      const t = window.test;
+      const validPNG = (await t.renderer.capture()).blob;
+      t.require(validPNG.type === 'image/png' && validPNG.size > 0, 'Failure injection requires a valid PNG');
+      const device = t.gpu.devices.at(-1);
+      const queue = device.queue;
+      const submit = queue.submit;
+      const toBlob = t.canvas.toBlob;
+      const states = [];
+      const unsubscribe = t.renderer.subscribe(state => states.push(state.status));
+      let finishPNG;
+      let completeErrorDelivery;
+      const errorDelivered = new Promise(resolve => { completeErrorDelivery = resolve; });
+      try {
+        t.canvas.toBlob = callback => { finishPNG = () => callback(validPNG); };
+        queue.submit = function (...args) {
+          const result = submit.apply(this, args);
+          queueMicrotask(() => {
+            device.dispatchEvent(new GPUUncapturedErrorEvent('uncapturederror', {
+              error: new GPUValidationError('Deliberate capture draw failure'),
+            }));
+            completeErrorDelivery();
+          });
+          return result;
+        };
+        // Observe rejection immediately, even if the error arrives before encoding finishes.
+        const outcome = t.renderer.capture().then(() => ({ succeeded: true }), error => ({ error }));
+        await errorDelivered;
+        t.require(typeof finishPNG === 'function', 'Capture did not start its PNG encoder');
+        finishPNG();
+        const result = await outcome;
+        t.require(states.join(',') === 'ready,error', `Draw failure emitted incorrect states: ${states}`);
+        t.require(t.renderer.getStatus() === 'error', 'Native draw failure did not terminate renderer readiness');
+        t.require(result.error instanceof Error, 'Capture resolved a PNG after its native draw failed');
+        t.require(/Deliberate capture draw failure/.test(result.error.message), 'Capture lost the native failure reason');
+      } finally {
+        queue.submit = submit;
+        t.canvas.toBlob = toBlob;
+        unsubscribe();
+      }
     }),
   },
   {
@@ -85,25 +137,26 @@ export const captureScenarios = [
           self.onmessage = async ({ data }) => {
             let landscape;
             try {
-              landscape = createLandscape(data.canvas, { width: 128, height: 96, seed: 'worker-capture' });
-              const gl = data.canvas.getContext('webgl2');
-              const before = new Uint8Array(128 * 96 * 4);
-              gl.readPixels(0, 0, 128, 96, gl.RGBA, gl.UNSIGNED_BYTE, before);
+              landscape = await createLandscape(data.canvas, { width: 128, height: 96, seed: 'worker-capture' });
+              async function decode(blob) {
+                const bitmap = await createImageBitmap(blob);
+                const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+                const context = canvas.getContext('2d');
+                context.drawImage(bitmap, 0, 0); bitmap.close();
+                return context.getImageData(0, 0, canvas.width, canvas.height).data;
+              }
+              const before = await decode((await landscape.capture()).blob);
               await new Promise(resolve => setTimeout(resolve, 0));
               const pending = landscape.capture();
               landscape.render({ seed: 'worker-next' });
               const frame = await pending;
-              const bitmap = await createImageBitmap(frame.blob);
-              const decoded = new OffscreenCanvas(bitmap.width, bitmap.height);
-              const context = decoded.getContext('2d');
-              context.drawImage(bitmap, 0, 0); bitmap.close();
-              const pixels = context.getImageData(0, 0, decoded.width, decoded.height).data;
+              const pixels = await decode(frame.blob);
               let difference = 0, min = 255, max = 0;
               for (let y = 0; y < 96; y++) for (let x = 0; x < 128; x++) for (let c = 0; c < 4; c++) {
-                difference += Math.abs(before[((95 - y) * 128 + x) * 4 + c] - pixels[(y * 128 + x) * 4 + c]);
+                difference += Math.abs(before[(y * 128 + x) * 4 + c] - pixels[(y * 128 + x) * 4 + c]);
               }
               for (let i = 0; i < pixels.length; i += 4) { min = Math.min(min, pixels[i]); max = Math.max(max, pixels[i]); }
-              self.postMessage({ min, max, error: gl.getError(), meanDifference: difference / before.length,
+              self.postMessage({ min, max, meanDifference: difference / before.length,
                 type: frame.blob.type, width: frame.width, height: frame.height, seed: frame.options.seed,
                 currentSeed: landscape.getOptions().seed });
             } catch (error) { self.postMessage({ failure: error.message }); }
@@ -122,7 +175,6 @@ export const captureScenarios = [
         } finally { worker.terminate(); URL.revokeObjectURL(url); }
       }, baseURL);
       assert.equal(result.failure, undefined, result.failure);
-      assert.equal(result.error, 0);
       assert.equal(result.type, 'image/png');
       assert.equal(result.seed, 'worker-capture');
       assert.equal(result.currentSeed, 'worker-next');

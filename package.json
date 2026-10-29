@@ -1,22 +1,51 @@
 {
   "name": "shan-shui-gpu",
   "version": "0.1.0",
-  "description": "Seeded Chinese ink landscapes generated entirely in WebGL2 shaders.",
+  "description": "Seeded Chinese ink landscapes generated in WebGPU shaders with vgpu.",
   "type": "module",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/samoojj/shan-shui-inf-gpu.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/samoojj/shan-shui-inf-gpu.git"
+  },
   "sideEffects": false,
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "src", "examples", "docs", "GLOSSARY.md", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "src",
+    "examples",
+    "docs",
+    "GLOSSARY.md",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/build.mjs",
+    "check:shaders": "vgpu check --require-validation src/shaders/landscape.wgsl",
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:browser": "npm run build && node tests/browser.mjs",
     "demo": "npm run build && node scripts/serve.mjs",
     "prepack": "npm run build"
   },
-  "devDependencies": { "@playwright/test": "^1.58.2", "typescript": "^5.9.3" },
-  "engines": { "node": ">=22" }
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@vgpu/wgsl": "0.6.0",
+    "@webgpu/types": "0.1.74",
+    "esbuild": "0.28.2",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "vgpu": "0.6.0"
+  }
 }

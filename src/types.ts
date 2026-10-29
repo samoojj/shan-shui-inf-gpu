@@ -1,9 +1,9 @@
 import type { LandscapeOptions } from "./options.js";
 
 export type LandscapeCanvas = HTMLCanvasElement | OffscreenCanvas;
-export type LandscapeStatus = "ready" | "context-lost" | "error" | "disposed";
+export type LandscapeStatus = "ready" | "device-lost" | "error" | "disposed";
 
-/** Renderer readiness, including reconstruction failures after native context restoration. */
+/** Device loss and GPU failures are terminal; dispose and create another renderer. */
 export interface LandscapeState {
   readonly status: LandscapeStatus;
   readonly error: Error | null;
@@ -18,7 +18,7 @@ export interface LandscapeImage {
 }
 
 export interface LandscapeRenderer {
-  /** Draw once. During context loss, retain valid changes for restoration. */
+  /** Submit one GPU frame. Rejects after device loss, failure, or disposal. */
   render(options?: Partial<LandscapeOptions>): void;
   resize(width: number, height: number, pixelRatio?: number): void;
   getOptions(): LandscapeOptions;

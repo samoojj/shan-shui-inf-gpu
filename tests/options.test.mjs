@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DEFAULT_OPTIONS, bufferSize, hashSeed, resolveOptions } from '../dist/options.js';
 
-test('package imports without browser globals and reports unsupported WebGL2 in Node', async () => {
-  const { createLandscape, isWebGL2Supported } = await import('../dist/index.js');
+test('package imports without browser globals and reports unsupported WebGPU in Node', async () => {
+  const { createLandscape, isWebGPUSupported } = await import('../dist/index.js');
   assert.equal(typeof createLandscape, 'function');
-  assert.equal(isWebGL2Supported(), false);
-  assert.throws(() => createLandscape(null), /canvas/i);
+  assert.equal(await isWebGPUSupported(), false);
+  await assert.rejects(createLandscape(null), /canvas/i);
 });
 
 test('seed hashing is stable, distinguishes seed types and retains Unicode', () => {

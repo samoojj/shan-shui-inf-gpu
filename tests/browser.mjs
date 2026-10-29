@@ -7,7 +7,7 @@ import { lifecycleScenarios } from './browser/lifecycle.mjs';
 import { captureScenarios } from './browser/capture.mjs';
 import { demoScenarios } from './browser/demo.mjs';
 
-// Real-browser correctness checks. SwiftShader results are not hardware benchmarks.
+// Native WebGPU correctness checks. SwiftShader results are not hardware benchmarks.
 const server = serve(0);
 await once(server, 'listening');
 const baseURL = `http://127.0.0.1:${server.address().port}`;
@@ -21,7 +21,7 @@ try {
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_EXECUTABLE || undefined,
     headless: true,
-    args: ['--no-sandbox', ...(process.env.SWIFTSHADER === '1' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [])],
+    args: ['--no-sandbox', '--enable-unsafe-webgpu', ...(process.env.SWIFTSHADER === '1' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'] : [])],
   });
   for (const scenario of selected) {
     await runScenario(browser, baseURL, scenario);

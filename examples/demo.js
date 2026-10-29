@@ -16,6 +16,7 @@ let pending = {};
 let cameraX = 0;
 let dragging = null;
 let capturing = false;
+let pageClosed = false;
 
 function reportError(error) {
   status.textContent = error instanceof Error ? error.message : String(error);
@@ -39,7 +40,7 @@ function cancelFrame() {
 // capture correctness stay behind the landscape interface.
 function renderSoon(patch) {
   Object.assign(pending, patch);
-  if (frame || !landscape || ["error", "disposed"].includes(landscape.getStatus())) return;
+  if (frame || !landscape || landscape.getStatus() !== "ready") return;
   frame = requestAnimationFrame(() => {
     frame = 0;
     try {
@@ -68,40 +69,52 @@ function stopDragging() {
 }
 
 function reflectRendererState(state) {
-  const unavailable = state.status === "error" || state.status === "disposed";
+  const unavailable = state.status !== "ready";
   controls.querySelectorAll("button, input").forEach(control => { control.disabled = unavailable; });
   syncSaveButton();
   if (state.status === "ready") {
     showPosition();
-  } else if (state.status === "context-lost") {
-    status.textContent = "The landscape was interrupted. Waiting to restore…";
   } else {
     cancelFrame();
     stopDragging();
     observer?.disconnect();
-    status.textContent = state.status === "error"
-      ? "The landscape could not be restored. Reload to try again."
-      : "The landscape has closed.";
+    status.textContent = state.status === "device-lost"
+      ? "The graphics connection was lost. Reload to draw a new landscape."
+      : state.status === "error"
+        ? "The landscape could not be drawn. Reload to try again."
+        : "The landscape has closed.";
   }
 }
 
-try {
-  const bounds = canvas.getBoundingClientRect();
-  landscape = createLandscape(canvas, {
-    seed: seed.value,
-    width: Math.max(1, Math.round(bounds.width)),
-    height: Math.max(1, Math.round(bounds.height)),
-    pixelRatio,
-  });
-  unsubscribe = landscape.subscribe(reflectRendererState);
-  observer = new ResizeObserver(entries => {
-    const { width, height } = entries[0].contentRect;
-    if (width > 0 && height > 0) renderSoon({ width: Math.round(width), height: Math.round(height), pixelRatio });
-  });
-  observer.observe(canvas);
-} catch (error) {
-  reportError(error);
+async function initializeLandscape() {
   controls.querySelectorAll("button, input").forEach(control => { control.disabled = true; });
+  status.textContent = "Preparing the landscape…";
+  try {
+    const bounds = canvas.getBoundingClientRect();
+    const renderer = await createLandscape(canvas, {
+      seed: seed.value,
+      width: Math.max(1, Math.round(bounds.width)),
+      height: Math.max(1, Math.round(bounds.height)),
+      pixelRatio,
+    });
+    // Initialization can finish after the visitor leaves this page.
+    if (pageClosed) {
+      renderer.dispose();
+      return;
+    }
+    landscape = renderer;
+    unsubscribe = landscape.subscribe(reflectRendererState);
+    if (landscape.getStatus() !== "ready") return;
+    observer = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) renderSoon({ width: Math.round(width), height: Math.round(height), pixelRatio });
+    });
+    observer.observe(canvas);
+  } catch (error) {
+    if (pageClosed) return;
+    reportError(error);
+    controls.querySelectorAll("button, input").forEach(control => { control.disabled = true; });
+  }
 }
 
 controls.addEventListener("submit", event => {
@@ -126,7 +139,7 @@ document.querySelector("#randomize").addEventListener("click", () => {
 document.querySelector("#reset").addEventListener("click", resetView);
 
 canvas.addEventListener("pointerdown", event => {
-  if (!landscape || ["error", "disposed"].includes(landscape.getStatus()) || event.button !== 0 || !event.isPrimary) return;
+  if (!landscape || landscape.getStatus() !== "ready" || event.button !== 0 || !event.isPrimary) return;
   canvas.focus({ preventScroll: true });
   dragging = { pointerId: event.pointerId, startX: event.clientX, cameraX };
   canvas.setPointerCapture(event.pointerId);
@@ -141,7 +154,7 @@ canvas.addEventListener("pointerup", stopDragging);
 canvas.addEventListener("pointercancel", stopDragging);
 canvas.addEventListener("lostpointercapture", stopDragging);
 canvas.addEventListener("keydown", event => {
-  if (!landscape || ["error", "disposed"].includes(landscape.getStatus())) return;
+  if (!landscape || landscape.getStatus() !== "ready") return;
   if (!["ArrowLeft", "ArrowRight", "Home"].includes(event.key)) return;
   event.preventDefault();
   if (event.key === "Home") resetView();
@@ -180,8 +193,11 @@ download.addEventListener("click", async () => {
 
 window.addEventListener("pagehide", event => {
   if (event.persisted) return;
+  pageClosed = true;
   cancelFrame();
   observer?.disconnect();
   unsubscribe?.();
   landscape?.dispose();
 });
+
+void initializeLandscape();
