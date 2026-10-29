@@ -109,3 +109,22 @@ mean channel error 0.716/255 and 0.254% of pixels differing by over 16/255. Thos
 historical figures verified the source study before the execution rewrite; they
 do not describe the current seed mapping. [Original algorithm studies](upstream.md)
 remain the construction authority.
+
+
+Current GPU construction, seed `1234`, 1200×700 pixels:
+
+![GPU-constructed landscape](images/gpu-1234.png)
+
+This image was inspected at native resolution. The final run reproduced its
+pixels on a cached redraw, uploaded **304 bytes** of scene settings/bookkeeping,
+read **48 bytes** of allocation summaries, and recorded zero main-thread GPU
+requests and zero observed main-thread long tasks. Instrumented peak buffer
+allocation was **79,964,628 bytes**. First-frame wall time was **160.7 seconds** on
+SwiftShader; this slow software result does not establish hardware performance.
+[Machine-readable measurements](measurements.json) include adapter identity,
+heartbeat timing, fixed-input errors and the tested code commit.
+
+The packed library includes both facade and worker. An isolated offline install
+passed strict consumer TypeScript without ambient WebGPU types, SSR import,
+capability probing and unchanged host randomness. Installed facade/worker bytes
+match the tested bundles. The portfolio checkout was left unchanged.
