@@ -1,18 +1,18 @@
 # Brush construction and the GPU port
 
-Source: [LingDong-/shan-shui-inf, pinned CPU reference](../reference/README.md).
+Source: [LingDong-/shan-shui-inf, pinned CPU reference](upstream.md).
 The procedural drawing is a sequence of objects and brush marks, not an implicit
 terrain surface. Preserve those objects and marks before changing their executor.
 
 ## The source primitives
 
-`poly` ([485–509](../reference/original.html#L485-L509)) emits an SVG polyline.
+`poly` ([485–509](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L485-L509)) emits an SVG polyline.
 Coordinates are translated and rounded to one decimal place. Its fill uses the
 SVG nonzero winding rule, including an implicit closing edge. Its stroke remains
 open unless the input explicitly repeats the first point. Fill, stroke color,
 and stroke width are independent; white fills hide previously painted marks.
 
-`stroke` ([516–576](../reference/original.html#L516-L576)) is a polygon generator,
+`stroke` ([516–576](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L516-L576)) is a polygon generator,
 not an SVG line stroke. It consumes one random `n0` for every nonempty input. At
 interior point `i`, width is `wid * fun(i / count)`, modulated by
 `(1 - noi) + noi * Noise.noise(i * 0.5, n0)`. The two neighboring segment angles
@@ -22,16 +22,16 @@ endpoints. Default `fun` is `sin(pi*t)`. The resulting polygon also receives a
 one-unit SVG outline by default. Replacing this with a constant-width line loses
 the taper, varying edges, pointed ends, and darker outline.
 
-`blob` ([578–625](../reference/original.html#L578-L625)) samples 21 profile points
+`blob` ([578–625](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L578-L625)) samples 21 profile points
 over `p=0..2`. Longitudinal position is `len/2 - abs(p-1)*len`; transverse position
 is `fun(p)*wid/2`. The original converts these into polar coordinates, rotates by
 `ang`, and multiplies each radius by a noisy factor. Its 21 noise samples are
-first seam-corrected and min/max-normalized by `loopNoise` ([404–415](../reference/original.html#L404-L415)).
+first seam-corrected and min/max-normalized by `loopNoise` ([404–415](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L404-L415)).
 One independent random noise offset is consumed per blob. Tree styles supply
 different profile functions; those shapes must remain distinct. `ret:1` is used
 by tree07 so its leaf polygons can be triangulated and shaded on the CPU.
 
-`texture` ([653–741](../reference/original.html#L653-L741)) creates many short
+`texture` ([653–741](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L653-L741)) creates many short
 centerlines from a contour grid. It first chooses all random segment extents.
 For each selected column, it interpolates neighboring contour rows using the
 original reversed weights: `floorRow*p + ceilRow*(1-p)`. Two noise evaluations
@@ -57,7 +57,7 @@ The GPU noise function must retain p5's absolute coordinates, cosine interpolati
 wrap constants 16/256/4095, four octaves, and 0.5 amplitude falloff.
 
 The original scene is painted over white, then multiplied over a mirrored
-512-square paper texture ([4335–4361](../reference/original.html#L4335-L4361)).
+512-square paper texture ([4335–4361](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L4335-L4361)).
 Paper uses `245 + noise(i*.1,j*.1)*10 - random()*20`, with RGB multipliers
 `1/.95/.85`, integer rounding, and mirrored coordinates. It consumes 66,049
 random values after initial scene generation. A generic beige background and

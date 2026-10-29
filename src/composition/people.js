@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * Ported from reference/original.html, lines 3324–3665.
+ * Ported from https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html, lines 3324–3665.
  * Original geometry, random-call order, and painter order are preserved.
  * SVG string accumulation is replaced by ordered DrawingCommand arrays.
  */

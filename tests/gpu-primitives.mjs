@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { init } from 'vgpu/node';
 import { loadSource } from './helpers/load-source.mjs';
-import { originalPrimitives } from './gpu/reference.mjs';
+import { gpuFixtures } from './gpu/fixtures.mjs';
 import { checkCoordinates } from './gpu/coordinates.mjs';
 import { checkNoise } from './gpu/noise.mjs';
 import { checkRaster } from './gpu/raster.mjs';
@@ -10,7 +10,7 @@ import { checkRaster } from './gpu/raster.mjs';
 const directory = new URL('../test-results/gpu-primitives/', import.meta.url);
 await rm(directory, { recursive: true, force: true });
 await mkdir(directory, { recursive: true });
-const original = await originalPrimitives();
+const fixture = await gpuFixtures();
 const { packDrawing } = await loadSource('src/scene/pack.ts');
 // Compatibility adapters default storage access in vertex/fragment stages to zero.
 const gpu = await init({ requiredLimits: { maxStorageBuffersInVertexStage: 2, maxStorageBuffersInFragmentStage: 2 } });
@@ -23,8 +23,8 @@ try {
   const report = {
     adapter,
     execution: software ? 'software WebGPU; correctness checks only' : 'WebGPU; adapter performance is not measured',
-    noise: await checkNoise(gpu, original),
-    coordinates: await checkCoordinates(gpu, original, packDrawing),
+    noise: await checkNoise(gpu, fixture),
+    coordinates: await checkCoordinates(gpu, fixture, packDrawing),
     raster: await checkRaster(gpu, packDrawing, directory),
   };
   await gpu.settled();

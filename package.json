@@ -26,16 +26,15 @@
     "README.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
-    "reference"
+    "licenses"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "check:shaders": "node scripts/check-shaders.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs tests/reference/*.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "test:browser": "npm run build && node tests/browser.mjs",
     "demo": "npm run build && node scripts/serve.mjs",
     "prepack": "npm run build",
-    "reference": "node scripts/reference.mjs",
     "compare:reference": "npm run build && node scripts/compare-reference.mjs",
     "test:gpu": "node tests/gpu-primitives.mjs"
   },

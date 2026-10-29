@@ -1,9 +1,10 @@
 # Verification against the original
 
-The reference is LingDong-/shan-shui-inf at commit
-`9f754d2b2e73495db7883d4d4055a7b0903b0454`. Its unchanged `index.html` is
-[archived here](../reference/original.html), with provenance in
-[reference/README.md](../reference/README.md). Tests verify its Git blob hash.
+The source is LingDong-/shan-shui-inf at commit
+`9f754d2b2e73495db7883d4d4055a7b0903b0454`; see [upstream provenance](upstream.md).
+After establishing parity, the vendored source and source-execution harnesses
+were removed. Acceptance tests now consume the independently captured data
+fixtures, without downloading or installing the original implementation.
 
 This port was built from the source studies of [terrain and planning](original-landscape.md),
 [trees](original-trees.md), [motifs](original-motifs.md), and [brush primitives](original-primitives.md).
@@ -12,7 +13,7 @@ The prior approximation shader is not the reference and has been removed.
 ## What the comparisons establish
 
 `npm test` exercises the actual composition factories and command recorders
-against the pinned original executed in an isolated test VM. It checks the
+against accepted outputs captured from the original in an isolated test VM. It checks the
 original double-precision random stream and lazy Perlin table, scene plans,
 chunk ordering, paints, direct polygons, brush controls, paper random draws,
 repeated views and extensions in both directions. The production library does
@@ -35,22 +36,24 @@ motif construction, curve sampling and tree07's geometry-dependent triangulation
 
 ## Whole-image comparison
 
-Run these commands to regenerate both sides:
+Compare a fresh GPU render against the accepted original seed `1234` image:
 
 ```sh
-CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run reference
 CHROMIUM_EXECUTABLE=/usr/bin/chromium SWIFTSHADER=1 npm run compare:reference
 ```
 
-The CPU harness captures three seeds (`1234`, `shan-shui`, `quiet-morning`) and
-23 individual motifs in isolated iframes. Repeating each reference reproduces
-its SVG and PNG exactly. The image comparison uses fresh scenes, camera `(0,0)`,
-scale `1.142`, 1200×700 logical/backing pixels and the original initial generation
-range. The reference image is a native-scale crop of the original 3000×800 SVG,
-not a stretched image. Paired PNGs, standalone comparison pages and error metrics
-are written to `test-results/comparison/`. The comparison fails if mean channel
-error reaches 3/255 or more than 3% of pixels differ by over 16/255 in any channel;
-actual measured errors are reported rather than replaced by pass/fail labels.
+The initial parity study captured three seeds (`1234`, `shan-shui`,
+`quiet-morning`) and 23 individual motifs in isolated iframes. Repeated originals
+reproduced their SVG and PNG exactly. The historical results appear below.
+The retained image acceptance test uses fresh seed `1234`, camera `(0,0)`, scale
+`1.142`, 1200×700 logical/backing pixels and the original generation range. Its
+baseline in `docs/images/original-1234.png` is a native-scale crop of the original
+3000×800 SVG, not a stretched image. It is not regenerated during testing.
+
+Paired PNGs, a standalone comparison page and error metrics are written to
+`test-results/comparison/`. The test fails if mean channel error reaches 3/255
+or more than 3% of pixels differ by over 16/255 in any channel. Actual measured
+errors are reported rather than replaced by pass/fail labels.
 
 GPU float32 arithmetic and this renderer's 4×4 edge coverage are different from
 JavaScript doubles and Chromium's SVG antialiasing. The small original “Pizza Hut”
@@ -103,7 +106,7 @@ bounds receive no CPU uploads, and cached camera redraws upload only uniforms.
 The strict build, all 17 Node tests, native shader/primitive checks and an isolated
 installed-tarball consumer pass. The consumer checks public TypeScript declarations
 without WebGPU ambient types, SSR import, capability probing, unchanged host
-randomness, runtime-bundle identity and packaged licenses/reference material.
+randomness, runtime-bundle identity and packaged licenses/documentation.
 
 ## Performance and limits
 
@@ -122,7 +125,7 @@ created chunks just as it does in the original. The API bounds visible width,
 backing pixel count and individual GPU storage buffers; retained world chunks
 still consume memory as exploration grows.
 
-The [original chunk culling](../reference/original.html#L3973-L3983) checks each
+The [original chunk culling](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3973-L3983) checks each
 chunk's anchor against the requested range plus a 512-unit margin. It does not
 test the full geometry's extent: a long distant mountain can disappear abruptly
 when the camera reaches `anchorX + 512`, even while part of it would remain in

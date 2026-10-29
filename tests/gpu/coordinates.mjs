@@ -1,17 +1,16 @@
 import assert from 'node:assert/strict';
-import { primitiveFixtures } from './fixtures.mjs';
 import { generatePaths } from './runtime.mjs';
 
 // SVG rounds to 0.1. Allow one rounding step when float32 lands on the other side
 // of a decimal boundary; report the observed error rather than hiding it.
 const tolerance = 0.11;
 
-export async function checkCoordinates(gpu, original, packDrawing) {
-  const fixtures = primitiveFixtures(original);
+export async function checkCoordinates(gpu, fixture, packDrawing) {
+  const fixtures = fixture.primitives;
   const packed = packDrawing(fixtures.map(fixture => fixture.command));
   const pointCount = fixtures.reduce((count, fixture) => count + fixture.expected.length, 0);
   assert.equal(packed.pointCount, pointCount, 'Packed output count differs from original SVG paths');
-  const generated = await generatePaths(gpu, packed, original.Noise.getTable());
+  const generated = await generatePaths(gpu, packed, fixture.table);
   const points = new Float32Array(await generated.points.read());
   const bounds = new Float32Array(await generated.bounds.read());
   let offset = 0;

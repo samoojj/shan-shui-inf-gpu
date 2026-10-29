@@ -77,8 +77,7 @@ single fullscreen landscape formula.
 
 The source audits are the implementation guide:
 [planning](original-landscape.md), [primitives](original-primitives.md),
-[trees](original-trees.md), and [motifs](original-motifs.md). They cite the archived
-upstream source rather than infer its rules from screenshots.
+[trees](original-trees.md), and [motifs](original-motifs.md). They cite the exact upstream revision used to establish parity.
 
 ## Randomness and comparison invariants
 
@@ -142,10 +141,12 @@ caller.
 
 ## Verification and change guide
 
-The upstream reference harness pins the original commit and Git blob, captures
-native-scale scenes and 23 isolated primitives, and checks repeats in fresh
-realms. It uses the original SVG application only as a test reference. The
-library neither executes that HTML nor uploads its rasterized output.
+Acceptance fixtures record independent outputs from the pinned upstream revision:
+random/noise samples, scene and command hashes, primitive coordinates, and an
+original image. Tests use these data files without executing or installing the
+original application. Source studies link to upstream; no duplicate reference
+implementation is retained or packaged. Fixture updates require independent
+capture and review, never automatic regeneration from the port.
 
 Recipe comparisons should inspect topology, command order, control geometry,
 and random state. GPU comparisons should use the same source seed, generation

@@ -1,12 +1,10 @@
 # Original tree algorithms and a faithful GPU port
 
-This is an analysis of the original CPU implementation, not a description of the
-replacement landscape shader. The source is `index.html` at commit
-`9f754d2b2e73495db7883d4d4055a7b0903b0454`, preserved locally as
-`reference/original.html`. Both files have Git blob hash
-`f0d1da751455f99b46756fcbdde8b02420f27d31`. Line citations below refer to that
-unchanged source. The original names are `tree01` through `tree08`; the visual
-labels here describe their construction, not botanical species.
+This is an analysis of [the original CPU implementation](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html)
+at commit `9f754d2b2e73495db7883d4d4055a7b0903b0454`, Git blob
+`f0d1da751455f99b46756fcbdde8b02420f27d31`. Citations point to that exact upstream
+file. The original names are `tree01` through `tree08`; the visual labels here
+describe construction, not botanical species.
 
 ## What the module actually produces
 
@@ -256,22 +254,22 @@ rendering quality, or performance for an implementation that has not been writte
 JavaScript double precision versus WGSL float precision, SVG edge antialiasing,
 and polygon coverage need explicit tolerances and side-by-side reference images.
 
-[poly]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L485-L509
-[stroke]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L516-L575
-[blob]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L578-L624
-[tree01]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L744-L801
-[tree02]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L803-L840
-[tree03]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L842-L916
-[branch]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L919-L988
-[twig]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L991-L1061
-[bark]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1064-L1188
-[tree04]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1191-L1276
-[tree05]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1279-L1371
-[tree06]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1374-L1487
-[tree07]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1490-L1579
-[tree08]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1582-L1723
-[noise]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L101-L110
-[random]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L417-L442
-[triangulation]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L307-L379
-[vegetation]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1838-L1985
-[flatdec]: https://github.com/samoojj/shan-shui-inf-gpu/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2234-L2349
+[poly]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L485-L509
+[stroke]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L516-L575
+[blob]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L578-L624
+[tree01]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L744-L801
+[tree02]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L803-L840
+[tree03]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L842-L916
+[branch]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L919-L988
+[twig]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L991-L1061
+[bark]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1064-L1188
+[tree04]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1191-L1276
+[tree05]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1279-L1371
+[tree06]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1374-L1487
+[tree07]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1490-L1579
+[tree08]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1582-L1723
+[noise]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L101-L110
+[random]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L417-L442
+[triangulation]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L307-L379
+[vegetation]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1838-L1985
+[flatdec]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2234-L2349

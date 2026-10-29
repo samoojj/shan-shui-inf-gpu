@@ -13,8 +13,8 @@ they do not substitute a mock or silently skip validation. Run
 `npm exec --no -- vgpu doctor` to diagnose the local adapter. `VGPU_CACHE_DIR`
 and `MESA_SHADER_CACHE_DIR` can point to writable cache directories when needed.
 
-The checks use the pinned, hash-verified original in `reference/original.html`
-as the noise and brush oracle. They exercise the production command packer and
+The checks use independent upstream outputs in [the accepted data fixtures](../fixtures/README.md)
+as the noise and brush oracle. No upstream code is executed or downloaded. They exercise the production command packer and
 native shaders, then read actual GPU buffers and pixels:
 
 - Noise samples cover signs, fractions, three dimensions and wrapped coordinates.

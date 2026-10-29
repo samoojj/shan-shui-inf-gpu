@@ -5,8 +5,8 @@ import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { serve } from './serve.mjs';
 
-// Run `npm run reference` first. The reference PNGs come from the pinned,
-// untouched upstream application in its own iframe, at the same 1.142 scale.
+// Compare against the accepted upstream PNG at the same 1.142 scale.
+// No upstream code, network fetch, or prior reference-capture run is needed.
 const output = resolve('test-results/comparison');
 await mkdir(output, { recursive: true });
 const server = serve(0);
@@ -20,8 +20,8 @@ try {
     args: ['--no-sandbox', '--enable-unsafe-webgpu', ...(process.env.SWIFTSHADER === '1'
       ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--disable-vulkan-surface'] : [])],
   });
-  for (const seed of (process.env.REFERENCE_SEEDS || '1234,shan-shui,quiet-morning').split(',')) {
-    const reference = await readFile(resolve(`test-results/reference/${seed}-1200x700.png`));
+  for (const seed of ['1234']) {
+    const reference = await readFile(resolve(`docs/images/original-${seed}.png`));
     const page = await browser.newPage({ viewport: { width: 1200, height: 700 } });
     await page.route('**/favicon.ico', route => route.fulfill({ status: 204 }));
     const errors = [];

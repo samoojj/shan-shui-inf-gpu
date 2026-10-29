@@ -1,10 +1,8 @@
 # How the original landscape is constructed
 
-This is a source study of the CPU implementation preserved in
-[`reference/original.html`](../reference/original.html), from upstream commit
-`9f754d2b2e73495db7883d4d4055a7b0903b0454`. It is the reference for a GPU port
-of the original construction, not a specification for a replacement visual
-style. Source links below use that preserved file's line numbers.
+This is a source study of [the original CPU implementation](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html)
+at upstream commit `9f754d2b2e73495db7883d4d4055a7b0903b0454`. Source links cite
+that exact upstream file; the reference application is no longer vendored.
 
 ## Construction, not a height-field shader
 
@@ -34,7 +32,7 @@ object's `y` anchor. `poly` rounds output coordinates to one decimal place and
 emits a styled SVG polyline; SVG closes the fill implicitly even when the
 stroke path is open. This quantization is part of the reference image, although
 the preceding construction uses JavaScript numbers.
-([485–509](../reference/original.html#L485-L509))
+([485–509](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L485-L509))
 
 ## Randomness and the noise field
 
@@ -44,7 +42,7 @@ base64-encoded JSON seed, avoids specified degenerate states, and advances ten
 times. Both the hash and recurrence execute in JavaScript double precision;
 the squared state is larger than the exact-integer range. A different integer
 PRNG or ordinary GPU `f32` recurrence is not seed-compatible merely because it
-has the same initial seed. ([1–59](../reference/original.html#L1-L59))
+has the same initial seed. ([1–59](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1-L59))
 
 `Noise.noise` is the p5-style table noise implementation: 4096 table entries,
 cosine interpolation, four octaves, initial amplitude `0.5`, and amplitude
@@ -52,7 +50,7 @@ falloff `0.5`. Negative input coordinates are reflected to positive values.
 The table is initialized **lazily** by consuming 4096 values from the same global
 random stream on the first noise call. An alternative `noiseSeed` LCG exists,
 but the landscape initialization calls `Math.seed`, not `Noise.noiseSeed`.
-([78–202](../reference/original.html#L78-L202))
+([78–202](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L78-L202))
 
 Random consumption is a dependency of the drawing:
 
@@ -66,7 +64,7 @@ Random consumption is a dependency of the drawing:
   count once. This occurs throughout `flatDec` and in gap-island planning.
 - Rejection sampling in `wtrand`/`randGaussian` consumes a variable number of
   random values. `normRand`, despite its name, is uniform interpolation, not a
-  Gaussian sample. ([417–442](../reference/original.html#L417-L442))
+  Gaussian sample. ([417–442](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L417-L442))
 - The initial `update()` occurs at line 4310 before the paper-generation loop at
   4342. Paper then consumes `257 * 257 = 66049` additional random values before
   later user-driven chunk generation. Running only the construction functions
@@ -85,7 +83,7 @@ explicit, tested compatibility decision.
 `Mount.mountain(xoff, yoff, seed, args)` defaults to height `100 + 400R`, width
 `400 + 200R`, 200 texture candidates, and middle/bottom vegetation enabled.
 `seed` is a coordinate of the shared noise field, not a fresh PRNG seed.
-([1804–1820](../reference/original.html#L1804-L1820))
+([1804–1820](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1804-L1820))
 
 It constructs ten rows of fifty points. For row `j = 0..9` and column `i = 0..49`:
 
@@ -100,7 +98,7 @@ y[j,i]   = -cos(a) * Noise(a + 10, j * 0.15, seed) * height * p + hoff[j]
 These are nested, shrinking, offset ridges, not ten independently placed
 mountains. The last sample is at `i=49`, not at the other cosine endpoint.
 The random height offsets are a prefix sum, one random draw per row.
-([1822–1836](../reference/original.html#L1822-L1836))
+([1822–1836](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1822-L1836))
 
 ### Painting order inside one mountain
 
@@ -109,20 +107,20 @@ erase objects already drawn behind them.
 
 | Order | Construction | Source |
 | --- | --- | --- |
-| 1 | Rim `Tree.tree02` clusters, offset upward by 5 | [1853–1873](../reference/original.html#L1853-L1873) |
-| 2 | Opaque white fill from outer row plus local point `[0, 40]` | [1875–1881](../reference/original.html#L1875-L1881) |
-| 3 | Outer-row tapered stroke, gray alpha `.3`, width `3`, noise factor `1` | [1882–1888](../reference/original.html#L1882-L1888) |
-| 4 | Foot polygons, then their outlines | [1890](../reference/original.html#L1890) |
-| 5 | Texture strokes, optionally including broad shade strokes | [1891–1897](../reference/original.html#L1891-L1897) |
-| 6 | Top `Tree.tree02` clusters | [1899–1916](../reference/original.html#L1899-L1916) |
-| 7 | Middle `Tree.tree01` and edge `Tree.tree03`, when `veg` is true | [1918–1988](../reference/original.html#L1918-L1988) |
-| 8 | Lower buildings, occasional summit building, transmission towers | [1990–2057](../reference/original.html#L1990-L2057) |
-| 9 | Edge rocks | [2059–2074](../reference/original.html#L2059-L2074) |
+| 1 | Rim `Tree.tree02` clusters, offset upward by 5 | [1853–1873](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1853-L1873) |
+| 2 | Opaque white fill from outer row plus local point `[0, 40]` | [1875–1881](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1875-L1881) |
+| 3 | Outer-row tapered stroke, gray alpha `.3`, width `3`, noise factor `1` | [1882–1888](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1882-L1888) |
+| 4 | Foot polygons, then their outlines | [1890](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1890) |
+| 5 | Texture strokes, optionally including broad shade strokes | [1891–1897](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1891-L1897) |
+| 6 | Top `Tree.tree02` clusters | [1899–1916](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1899-L1916) |
+| 7 | Middle `Tree.tree01` and edge `Tree.tree03`, when `veg` is true | [1918–1988](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1918-L1988) |
+| 8 | Lower buildings, occasional summit building, transmission towers | [1990–2057](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1990-L2057) |
+| 9 | Edge rocks | [2059–2074](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2059-L2074) |
 
 Rim vegetation precedes the body fill, so the fill masks its lower portions.
 The `veg` flag does **not** disable rim/top clusters, buildings, towers, or rocks.
 The `ret` option changes the final return value but does not skip this preceding
-construction or its random consumption. ([2076–2080](../reference/original.html#L2076-L2080))
+construction or its random consumption. ([2076–2080](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2076-L2080))
 
 ### Foot construction
 
@@ -133,7 +131,7 @@ The bridge interpolates the endpoints and adds
 `-1.7 * (p - 1) * p^(1/5) * 5 + Noise(xoff * .05, row) * 5` to height.
 All foot polygons receive white fills first, followed by width-1 gray strokes
 with independently selected alpha in `[.1,.2)`.
-([1728–1801](../reference/original.html#L1728-L1801))
+([1728–1801](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1728-L1801))
 
 ### Texture is sampled geometry
 
@@ -142,7 +140,7 @@ thirds of the row, a half-length `floor(R * columnCount * .2)`, and clip the
 column interval. The default distribution uses two draws: one selects a side,
 one chooses a position within that third. For a 50-column mountain the
 half-length is 0–9, so a candidate has at most 18 centerline points.
-([653–695](../reference/original.html#L653-L695))
+([653–695](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L653-L695))
 
 The row coordinate is `layer = (t/T) * (rowCount - 1)`. For each selected column,
 the exact source interpolation is:
@@ -159,16 +157,16 @@ Here `lowerRowPoint` means row `floor(layer)` and `upperRowPoint` means
 silently swapping them changes the reference construction. The resulting
 short polylines follow the mountain's sampled ridges and are noisier near the
 outer rows. They are not regularly spaced screen-space contour bands.
-([697–717](../reference/original.html#L697-L717))
+([697–717](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L697-L717))
 
 Mountain shading selects `sha` from `[0,0,0,0,5]`. With `sha=0`, every candidate
 is stroked at default width `1.5` with random gray alpha in `[0,.3)`. With
 `sha=5`, even-indexed candidates first receive broad width-5, alpha-.1 strokes;
 fine strokes then start at index 5 and advance by 6. The default mountain thus
 requests either 200 fine strokes, or 100 broad plus 33 fine strokes, before
-empty-path handling. ([668–683](../reference/original.html#L668-L683),
-[719–740](../reference/original.html#L719-L740),
-[1891–1897](../reference/original.html#L1891-L1897))
+empty-path handling. ([668–683](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L668-L683),
+[719–740](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L719-L740),
+[1891–1897](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1891-L1897))
 
 `stroke` expands a polyline into a filled ribbon. Interior width is
 `wid * sin(pi * i / pointCount)`, multiplied by
@@ -176,14 +174,14 @@ empty-path handling. ([668–683](../reference/original.html#L668-L683),
 neighboring segment angles; the two edge lists and endpoints form a closed
 polygon. The polygon also gets the requested SVG outline (default width 1).
 It consumes one random phase for each nonempty input path.
-([516–575](../reference/original.html#L516-L575))
+([516–575](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L516-L575))
 
 ### Vegetation and motif placement
 
 `vegetate` scans the grid in row-major order, collects candidates, then runs a
 proof predicate and constructs accepted motifs in collected order. There is
 no independent uniform distribution of tree positions.
-([1838–1852](../reference/original.html#L1838-L1852))
+([1838–1852](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1838-L1852))
 
 | Motif pass | Candidate rule and construction |
 | --- | --- |
@@ -196,7 +194,7 @@ no independent uniform distribution of tree positions.
 | Transmission towers | Even rows, columns 1 or 48; noise with `seed+20*pi` to the fourth power `<.002`; `transmissionTower01`. |
 | Edge rocks | Columns 0 or 49, independent probability `.1`; `Mount.rock`, width and height each `20+20R`, shade width 2. |
 
-These rules are in [1853–2074](../reference/original.html#L1853-L2074). The middle
+These rules are in [1853–2074](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1853-L2074). The middle
 proof pass is a neighborhood-count operation over the candidate list, with an
 early return after three neighbors; it is not a Bernoulli density control.
 
@@ -207,7 +205,7 @@ early return after three neighbors; it is not a Bernoulli density control.
 `y=-(cos(2*a)+1)*Noise(a+10,j*.1,seed)*height*p+hoff`. Each row again receives
 a cumulative `R*yoff/100` offset. Heights above the horizontal cutoff are
 clamped to `-100*cho+hoff`; entry and exit points of clamped runs are collected
-in `flat`. ([2083–2125](../reference/original.html#L2083-L2125))
+in `flat`. ([2083–2125](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2083-L2125))
 
 The outer silhouette is white-filled and outlined like a regular mountain.
 Eighty width-2 texture candidates use centers distributed in `.1.. .5` or
@@ -216,7 +214,7 @@ extracts the first and last plateau endpoints from every other row. It extends
 both sides with three points at each end, subdivides each segment into five,
 and varies their horizontal scale by a triangular envelope and noise. The
 combined path becomes another white-filled, width-3 gray-outlined land surface.
-([2127–2205](../reference/original.html#L2127-L2205))
+([2127–2205](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2127-L2205))
 
 `flatDec` receives the bounding box of that generated surface, not a generic
 mountain height field. Its ordered recipe is:
@@ -229,7 +227,7 @@ mountain height field. Its ordered recipe is:
 
 The theme branches and their different random loop conditions matter; replacing
 them with a generic pine/temple scatter loses a substantial part of the original
-foreground. ([2207–2366](../reference/original.html#L2207-L2366))
+foreground. ([2207–2366](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2207-L2366))
 
 ## Distant mountains and rocks
 
@@ -242,8 +240,8 @@ six top samples and four lower samples. Each block is filled, triangulated with
 edge until area is below 100. Every small triangle gets gray
 `floor(200 + 55*Noise(midX*.02,midY*.02,yoff))` for fill and width-1 stroke.
 These facets are actual painted shapes.
-([2369–2430](../reference/original.html#L2369-L2430),
-[322–379](../reference/original.html#L322-L379))
+([2369–2430](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2369-L2430),
+[322–379](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L322-L379))
 
 `rock` constructs ten nested 50-point rings. It samples noise around each ring,
 uses `loopNoise` to match the endpoints and renormalize the values, and modulates
@@ -263,8 +261,8 @@ y += height*(row/10)*.2
 The outer ring is white-filled and outlined; 40 texture candidates shade the
 ring stack. Their centers use `.15.. .30` or `.70.. .85`, width 3, and gray 180
 with alpha `.3.. .6`. Default shade width is 10; callers frequently override
-it to 2 or 5. ([2433–2521](../reference/original.html#L2433-L2521),
-[404–414](../reference/original.html#L404-L414))
+it to 2 or 5. ([2433–2521](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2433-L2521),
+[404–414](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L404-L414))
 
 ## Water strokes
 
@@ -275,7 +273,7 @@ len/16)`, cumulative vertical increments `5R`, and half-length
 `sin(x*.2)*hei*Noise(x*.1)-20+verticalOffset`. The first candidate is generated
 but not drawn; candidates 1 through 9 become width-1 tapered strokes with gray
 alpha `.3.. .6`. Defaults are `len=800`, `hei=2`. The supplied `seed` is unused.
-([3667–3703](../reference/original.html#L3667-L3703))
+([3667–3703](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3667-L3703))
 
 ## World planner and chunk order
 
@@ -283,7 +281,7 @@ alpha `.3.. .6`. Defaults are `len=800`, `hei=2`. The supplied `seed` is unused.
 It initializes an occupancy array at `floor(x/5)` indices for the requested
 range. Its candidate sampling starts at the supplied `xmin` and advances by 5;
 512-unit chunk boundaries therefore do not form one global 5-unit lattice.
-([3706–3754](../reference/original.html#L3706-L3754))
+([3706–3754](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3706-L3754))
 
 1. **Mountains and distant ridges.** At each sampled `x`, scan `y` in 30-unit
    steps up to `480*Noise(x*.01,pi)`. The field tested for a local maximum is
@@ -304,7 +302,7 @@ range. Its candidate sampling starts at the supplied `xmin` and advances by 5;
 
 The record field `h` stores the planning field value but the loader does not use
 it to set mountain height. The helper fields `nns` and `nnns` are defined but
-unused. ([3756–3813](../reference/original.html#L3756-L3813))
+unused. ([3756–3813](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3756-L3813))
 
 There are source quirks worth recording before changing behavior: `chadd` has
 no cross-chunk record check; occupancy increments may touch uninitialized array
@@ -318,8 +316,8 @@ one chunk of margin on each side. It always chooses the right extension before
 the left when both are needed. It constructs objects in the planner's record
 order, consuming the global random stream, then inserts each completed object
 into `MEM.chunks` by ascending `y` drawing key.
-([3816–3827](../reference/original.html#L3816-L3827),
-[3845–3888](../reference/original.html#L3845-L3888))
+([3816–3827](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3816-L3827),
+[3845–3888](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3845-L3888))
 
 | Record | Loader construction |
 | --- | --- |
@@ -328,7 +326,7 @@ into `MEM.chunks` by ascending `y` drawing key.
 | `distmount` | `Mount.distMount(x,y,100R)` with height `150`, length chosen from `[500,1000,1500]`. |
 | `boat` | `Arch.boat01(x,y,R)` with scale `y/800` and a random flip. |
 
-([3888–3938](../reference/original.html#L3888-L3938))
+([3888–3938](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3888-L3938))
 
 The low water key causes water to be drawn behind landscape objects. Sorting by
 base `y` gives near objects later white occlusion, not translucent blending of
@@ -337,15 +335,15 @@ behavior (`<=` prepends at the front, `>=` appends at the back); it is not simpl
 an unspecified sort. `chunkrender` preserves the resulting order and includes
 objects whose **anchors** fall within the visible interval plus 512 units.
 Objects remain cached indefinitely in the source implementation.
-([3846–3868](../reference/original.html#L3846-L3868),
-[3973–3983](../reference/original.html#L3973-L3983))
+([3846–3868](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3846-L3868),
+[3973–3983](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3973-L3983))
 
 The final SVG is multiplied over a repeated 512-by-512 paper image. Paper uses
 `c=245+10*Noise(i*.1,j*.1)-20R`, RGB `(c,.95c,.85c)`, rounded to integer channel
 values, mirrored into four quadrants. White polygon fills remain paper-colored
 after multiplication, while still occluding earlier ink within the SVG.
-([4023–4037](../reference/original.html#L4023-L4037),
-[4336–4360](../reference/original.html#L4336-L4360))
+([4023–4037](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L4023-L4037),
+[4336–4360](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L4336-L4360))
 
 ## Cost and dependencies
 

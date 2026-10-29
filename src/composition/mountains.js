@@ -1,7 +1,7 @@
 /**
  * Faithful command-output port of Lingdong Huang's shan-shui construction.
  * Copyright (c) 2018 Lingdong Huang. MIT; see ../../LICENSE.
- * Source: reference/original.html at 9f754d2b2e73495db7883d4d4055a7b0903b0454.
+ * Source: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html at 9f754d2b2e73495db7883d4d4055a7b0903b0454.
  * Arithmetic, sampling, branch order, and random consumption are unchanged.
  * SVG string concatenation is replaced with ordered drawing-command arrays.
  */

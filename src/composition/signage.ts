@@ -2,7 +2,7 @@
  * Shan Shui Signage: fixed vector outlines for the original "Pizza Hut" label.
  * Glyph data derived from Liberation Sans Regular 2.1.5; SIL OFL 1.1.
  * Copyright (c) 2010 Google Corporation; Copyright (c) 2012 Red Hat, Inc.
- * Full font copyright, reserved names, and license: reference/font-license.txt.
+ * Full font copyright, reserved names, and license: licenses/LiberationSans-OFL.txt.
  *
  * The original SVG requested Verdana. It is unavailable here, and fontconfig's
  * local fallback is OpenAI Sans; these redistributable outlines deliberately use

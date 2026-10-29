@@ -6,23 +6,11 @@ import { resolveShader } from "@vgpu/wgsl/runtime";
 
 const tolerance = 2e-6;
 
-/** Compare the production WGSL to the pinned original, using its initialized noise table. */
-export async function checkNoise(gpu, original) {
-  const positions = Array.from({ length: 256 }, (_, index) => [
-    Math.fround(Math.sin(index * 0.51) * 3000),
-    Math.fround(Math.cos(index * 0.37) * 30),
-    Math.fround((index % 13) / 7),
-  ]);
-  positions.push(
-    [0, 0, 0],
-    [-1, -16, -256],
-    [4095.75, 4096.25, 0.5],
-    [4096, 4096, 4096],
-  );
-
-  const originalTable = original.Noise.getTable();
-  assert.equal(originalTable?.length, 4096, "Initialize the original noise table before this check");
-  const expected = positions.map((position) => original.Noise.noise(...position));
+/** Compare production WGSL to accepted upstream samples and the captured noise table. */
+export async function checkNoise(gpu, fixture) {
+  const { positions, expected } = fixture.noise;
+  const originalTable = fixture.table;
+  assert.equal(originalTable.length, 4096, "Acceptance data must include the complete noise table");
   const noiseSource = await readFile(new URL("../../src/shaders/noise.wgsl", import.meta.url), "utf8");
   const resolved = await resolveShader({
     entry: "probe.wgsl",

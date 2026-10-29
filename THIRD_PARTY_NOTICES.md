@@ -31,4 +31,4 @@ SOFTWARE.
 The small roof plaque uses outlines from Liberation Sans Regular 2.1.5,
 licensed under the SIL Open Font License 1.1. This replaces the original
 browser-dependent Verdana text. The full copyright notice and license are
-in [reference/font-license.txt](reference/font-license.txt).
+in [licenses/LiberationSans-OFL.txt](licenses/LiberationSans-OFL.txt).

@@ -188,7 +188,7 @@ There is no SVG export.
 
 ## Fidelity, determinism, and execution
 
-The archived source is the official upstream commit
+The port follows the official upstream commit
 [`9f754d2b2e73495db7883d4d4055a7b0903b0454`](https://github.com/LingDong-/shan-shui-inf/tree/9f754d2b2e73495db7883d4d4055a7b0903b0454),
 with HTML Git blob `f0d1da751455f99b46756fcbdde8b02420f27d31`, verified against
 the original upstream checkout. The port preserves its mutable PRNG's JavaScript double
@@ -243,7 +243,7 @@ The source audits explain the original method with line citations:
 
 ## Verification
 
-See [the verification report](docs/verification.md) for the source oracle, GPU
+See [the verification report](docs/verification.md) for acceptance fixtures, GPU
 coordinate checks, image-comparison procedure and measured limitations.
 
 ```sh
@@ -252,35 +252,34 @@ npm run check:shaders
 npm run test:gpu
 npx playwright install chromium
 npm run test:browser
-npm run reference
 npm run compare:reference
 npm pack --dry-run
 ```
 
-`npm run reference` runs the archived CPU application separately, verifies its
-source identity, and records full scenes plus 23 isolated primitive fixtures.
-`npm run compare:reference` captures the GPU port at the same seed and view,
-writes paired images and per-channel error metrics, and records adapter identity.
-`npm run test:gpu` checks GPU noise, expanded coordinates, and SVG fill/stroke
-semantics against the pinned source; see [GPU tests](https://github.com/samoojj/shan-shui-inf-gpu/blob/codex/gpu-landscape-library/tests/gpu/README.md).
-See [the reference harness](https://github.com/samoojj/shan-shui-inf-gpu/blob/codex/gpu-landscape-library/tests/reference/README.md) for seeds, native-scale
-crops, output artifacts, and exact-repeat checks. Its original SVG/pixel output
-is the comparison target; a repeatable GPU image alone does not prove a faithful
-port.
+Acceptance tests use numeric outputs and hashes captured independently from the
+verified upstream revision. The original application is no longer vendored,
+executed by tests, or installed as a dependency. Source citations point to
+[the pinned upstream revision](docs/upstream.md).
+
+`npm run compare:reference` compares a fresh GPU render of seed `1234` against
+the accepted original PNG, with no source download or preparatory capture step.
+It writes paired images, per-channel errors and adapter identity.
+`npm run test:gpu` checks noise, expanded coordinates and fill/stroke semantics;
+see [GPU tests](https://github.com/samoojj/shan-shui-inf-gpu/blob/codex/gpu-landscape-library/tests/gpu/README.md)
+and [fixture provenance](https://github.com/samoojj/shan-shui-inf-gpu/blob/codex/gpu-landscape-library/tests/fixtures/README.md).
 
 Use an installed Chromium and software WebGPU when needed:
 
 ```sh
 CHROMIUM_EXECUTABLE=/usr/bin/chromium SWIFTSHADER=1 npm run test:browser
-CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run reference
 ```
 
 Shader validation requires a WebGPU device. Diagnose availability with
 `npm exec --no -- vgpu doctor`; the installed vgpu documentation describes its
 software renderer. Build preparation alone is not device validation. For shader
 changes, edit the native `.wgsl` files, rebuild, validate, and inspect rendered
-results. The strict build and tests should be run separately from the reference
-capture so their provenance remains clear.
+results. The accepted data fixtures remain separate from generated test results;
+running verification never overwrites a baseline.
 
 ## Attribution and license
 
@@ -288,7 +287,7 @@ The original algorithm and source are MIT-licensed, copyright 2018 Lingdong
 Huang; see [LICENSE](LICENSE). Ported composition modules retain that attribution
 and source locations. vgpu is an MIT-licensed dependency from Vercel Labs; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The signage outlines derive from
-Liberation Sans under the [SIL Open Font License](reference/font-license.txt).
+Liberation Sans under the [SIL Open Font License](licenses/LiberationSans-OFL.txt).
 
 Images in `screenshots/` are historical output of the original SVG application.
 They are retained as references and do not demonstrate this renderer's output.
