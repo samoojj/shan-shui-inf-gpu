@@ -1,7 +1,7 @@
 {
   "name": "shan-shui-gpu",
   "version": "0.1.0",
-  "description": "Seeded Chinese ink landscapes generated in WebGPU shaders with vgpu.",
+  "description": "Lingdong Huang's procedural ink landscapes, ported to GPU brushes and rendering with WebGPU and vgpu.",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -25,22 +25,27 @@
     "GLOSSARY.md",
     "README.md",
     "LICENSE",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "reference"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check:shaders": "vgpu check --require-validation src/shaders/landscape.wgsl",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "check:shaders": "node scripts/check-shaders.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs tests/reference/*.test.mjs",
     "test:browser": "npm run build && node tests/browser.mjs",
     "demo": "npm run build && node scripts/serve.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "reference": "node scripts/reference.mjs",
+    "compare:reference": "npm run build && node scripts/compare-reference.mjs",
+    "test:gpu": "node tests/gpu-primitives.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@vgpu/wgsl": "0.6.0",
     "@webgpu/types": "0.1.74",
     "esbuild": "0.28.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "pngjs": "7.0.0"
   },
   "engines": {
     "node": ">=22"

@@ -8,6 +8,9 @@ import { captureScenarios } from './browser/capture.mjs';
 import { demoScenarios } from './browser/demo.mjs';
 
 // Native WebGPU correctness checks. SwiftShader results are not hardware benchmarks.
+// API fixtures preserve a 320×256 logical view at pixelRatio 0.25 (80×64 pixels),
+// with separate overlap/resize cases. Demo DPR is 0.25; full-size original-image
+// comparisons run separately so software testing does not repaint huge scenes.
 const server = serve(0);
 await once(server, 'listening');
 const baseURL = `http://127.0.0.1:${server.address().port}`;

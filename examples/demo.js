@@ -1,4 +1,4 @@
-import { createLandscape } from "../dist/index.js";
+import { createLandscape, DEFAULT_OPTIONS } from "../dist/index.js";
 
 const canvas = document.querySelector("#landscape");
 const status = document.querySelector("#status");
@@ -52,15 +52,15 @@ function renderSoon(patch) {
 }
 
 function setCamera(value) {
-  cameraX = Math.max(-1e6, Math.min(1e6, value));
+  cameraX = Math.max(-8192, Math.min(8192, value));
   renderSoon({ cameraX });
 }
 
 function resetView() {
   cameraX = 0;
-  zoom.value = "1";
-  document.querySelector("#zoom-value").value = "1.00×";
-  renderSoon({ cameraX: 0, cameraY: 0, zoom: 1 });
+  zoom.value = String(DEFAULT_OPTIONS.zoom);
+  document.querySelector("#zoom-value").value = `${DEFAULT_OPTIONS.zoom.toFixed(3)}×`;
+  renderSoon({ cameraX: 0, cameraY: 0, zoom: DEFAULT_OPTIONS.zoom });
 }
 
 function stopDragging() {
@@ -119,21 +119,19 @@ async function initializeLandscape() {
 
 controls.addEventListener("submit", event => {
   event.preventDefault();
+  resetView();
   renderSoon({ seed: seed.value });
 });
 
-for (const name of ["layers", "mist", "vegetation", "zoom"]) {
-  const input = document.querySelector(`#${name}`);
-  const output = document.querySelector(`#${name}-value`);
-  input.addEventListener("input", () => {
-    const value = Number(input.value);
-    output.value = name === "layers" ? String(value) : name === "zoom" ? `${value.toFixed(2)}×` : `${Math.round(value * 100)}%`;
-    renderSoon({ [name]: value });
-  });
-}
+zoom.addEventListener("input", () => {
+  const value = Number(zoom.value);
+  document.querySelector("#zoom-value").value = `${value.toFixed(3)}×`;
+  renderSoon({ zoom: value });
+});
 
 document.querySelector("#randomize").addEventListener("click", () => {
   seed.value = `ink-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
+  resetView();
   renderSoon({ seed: seed.value });
 });
 document.querySelector("#reset").addEventListener("click", resetView);
@@ -147,7 +145,7 @@ canvas.addEventListener("pointerdown", event => {
 });
 canvas.addEventListener("pointermove", event => {
   if (!dragging || dragging.pointerId !== event.pointerId) return;
-  const worldUnitsPerPixel = 1000 / (Number(zoom.value) * canvas.getBoundingClientRect().height);
+  const worldUnitsPerPixel = 1 / Number(zoom.value);
   setCamera(dragging.cameraX - (event.clientX - dragging.startX) * worldUnitsPerPixel);
 });
 canvas.addEventListener("pointerup", stopDragging);

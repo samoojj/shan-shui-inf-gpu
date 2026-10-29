@@ -3,8 +3,13 @@
     "target": "ES2020",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2020", "DOM"],
-    "types": ["@webgpu/types"],
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
+    "types": [
+      "@webgpu/types"
+    ],
     "strict": true,
     "noEmitOnError": true,
     "declaration": true,
@@ -15,7 +20,12 @@
     "rootDir": "src",
     "skipLibCheck": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "allowJs": true,
+    "checkJs": false
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.js"
+  ]
 }

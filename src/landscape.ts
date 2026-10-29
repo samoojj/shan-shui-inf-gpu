@@ -92,7 +92,7 @@ export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<La
   }
 
   function getOptions(): LandscapeOptions {
-    return { ...options, paper: [...options.paper], ink: [...options.ink] };
+    return { ...options };
   }
 
   async function capture(patch: Partial<LandscapeOptions> = {}): Promise<LandscapeImage> {

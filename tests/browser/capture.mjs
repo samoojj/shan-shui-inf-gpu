@@ -5,7 +5,7 @@ export const captureScenarios = [
     name: 'capture redraws after a browser task and preserves image settings while the scene changes',
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
-      t.renderer.render({ seed: 'captured-scene', width: 192, height: 144 });
+      t.renderer.render({ seed: 'captured-scene', width: 192, height: 144, cameraY: 160 });
       const expected = await t.pixels();
       // Capture must redraw the requested scene after presentation has occurred.
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -14,7 +14,8 @@ export const captureScenarios = [
       const frame = await pending;
       t.require(frame.blob.type === 'image/png', 'Capture must return a PNG');
       t.require(frame.options.seed === 'captured-scene', 'Capture metadata followed a later render');
-      t.require(frame.width === 192 && frame.height === 144, 'Capture dimensions followed a later resize');
+      t.require(frame.width === 48 && frame.height === 36, 'Capture dimensions followed a later resize');
+      t.require(frame.options.width === 192 && frame.options.height === 144, 'Capture lost its logical dimensions');
       t.require(t.renderer.getOptions().seed === 'newer-scene', 'Capture changed the current scene');
       const decoded = await t.decodePNG(frame.blob);
       t.require(decoded.width === frame.width && decoded.height === frame.height, 'PNG dimensions disagree with capture metadata');
@@ -32,10 +33,10 @@ export const captureScenarios = [
       const t = window.test;
       const before = JSON.stringify(t.renderer.getOptions());
       let rejected = false;
-      try { await t.renderer.capture({ seed: 'invalid-patch', layers: 100 }); } catch { rejected = true; }
+      try { await t.renderer.capture({ seed: 'invalid-patch', zoom: 0 }); } catch { rejected = true; }
       t.require(rejected, 'Invalid capture options must reject');
       t.require(JSON.stringify(t.renderer.getOptions()) === before, 'Invalid capture partially changed settings');
-      const pending = t.renderer.capture({ seed: 'before-disposal' });
+      const pending = t.renderer.capture({ seed: 'before-disposal', cameraY: 160 });
       t.renderer.dispose();
       const frame = await pending;
       t.require(t.renderer.getStatus() === 'disposed', 'Capture revived a disposed renderer');
@@ -137,7 +138,7 @@ export const captureScenarios = [
           self.onmessage = async ({ data }) => {
             let landscape;
             try {
-              landscape = await createLandscape(data.canvas, { width: 128, height: 96, seed: 'worker-capture' });
+              landscape = await createLandscape(data.canvas, { width: 128, height: 96, pixelRatio: 0.25, cameraY: 240, seed: 'worker-capture' });
               async function decode(blob) {
                 const bitmap = await createImageBitmap(blob);
                 const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
@@ -152,12 +153,13 @@ export const captureScenarios = [
               const frame = await pending;
               const pixels = await decode(frame.blob);
               let difference = 0, min = 255, max = 0;
-              for (let y = 0; y < 96; y++) for (let x = 0; x < 128; x++) for (let c = 0; c < 4; c++) {
-                difference += Math.abs(before[(y * 128 + x) * 4 + c] - pixels[(y * 128 + x) * 4 + c]);
+              for (let y = 0; y < frame.height; y++) for (let x = 0; x < frame.width; x++) for (let c = 0; c < 4; c++) {
+                difference += Math.abs(before[(y * frame.width + x) * 4 + c] - pixels[(y * frame.width + x) * 4 + c]);
               }
               for (let i = 0; i < pixels.length; i += 4) { min = Math.min(min, pixels[i]); max = Math.max(max, pixels[i]); }
               self.postMessage({ min, max, meanDifference: difference / before.length,
                 type: frame.blob.type, width: frame.width, height: frame.height, seed: frame.options.seed,
+                logicalWidth: frame.options.width, logicalHeight: frame.options.height,
                 currentSeed: landscape.getOptions().seed });
             } catch (error) { self.postMessage({ failure: error.message }); }
             finally { landscape?.dispose(); }
@@ -166,7 +168,7 @@ export const captureScenarios = [
         const worker = new Worker(url, { type: 'module' });
         try {
           return await new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error('Worker capture timed out')), 20000);
+            const timer = setTimeout(() => reject(new Error('Worker capture timed out')), 120000);
             worker.onmessage = ({ data }) => { clearTimeout(timer); resolve(data); };
             worker.onerror = error => { clearTimeout(timer); reject(new Error(error.message)); };
             const canvas = new OffscreenCanvas(128, 96);
@@ -178,8 +180,10 @@ export const captureScenarios = [
       assert.equal(result.type, 'image/png');
       assert.equal(result.seed, 'worker-capture');
       assert.equal(result.currentSeed, 'worker-next');
-      assert.equal(result.width, 128);
-      assert.equal(result.height, 96);
+      assert.equal(result.width, 32);
+      assert.equal(result.height, 24);
+      assert.equal(result.logicalWidth, 128);
+      assert.equal(result.logicalHeight, 96);
       assert(result.max - result.min > 30, JSON.stringify(result));
       assert(result.meanDifference < 0.1, JSON.stringify(result));
     },

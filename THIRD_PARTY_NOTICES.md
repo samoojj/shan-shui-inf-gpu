@@ -25,3 +25,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Signage outlines
+
+The small roof plaque uses outlines from Liberation Sans Regular 2.1.5,
+licensed under the SIL Open Font License 1.1. This replaces the original
+browser-dependent Verdana text. The full copyright notice and license are
+in [reference/font-license.txt](reference/font-license.txt).

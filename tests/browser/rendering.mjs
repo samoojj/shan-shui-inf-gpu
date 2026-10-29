@@ -34,29 +34,45 @@ export const renderingScenarios = [
     }),
   },
   {
-    name: 'panning is repeatable in positive and negative world coordinates',
+    name: 'cached views repeat after positive and negative camera excursions',
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
-      for (const cameraX of [-4000, 7000, -450, 0]) t.renderer.render({ cameraX });
-      t.require(t.hash(await t.pixels()) === t.hash(t.initial), 'Pan order changed the world');
+      // The original grows a stateful chunk cache. Warm both sides before
+      // comparing repeated visits, so new offscreen objects are not introduced.
+      t.renderer.render({ cameraX: -600 });
+      t.renderer.render({ cameraX: 600 });
+      t.renderer.render({ cameraX: 0 });
+      const origin = t.hash(await t.pixels());
       t.renderer.render({ cameraX: -600 });
       const negative = t.hash(await t.pixels());
-      t.renderer.render({ cameraX: 20000 }); t.renderer.render({ cameraX: -600 });
-      t.require(t.hash(await t.pixels()) === negative, 'Negative world is not stable');
+      t.renderer.render({ cameraX: 600 }); t.renderer.render({ cameraX: -600 });
+      t.require(t.hash(await t.pixels()) === negative, 'Cached negative view changed');
+      t.renderer.render({ cameraX: 0 });
+      t.require(t.hash(await t.pixels()) === origin, 'Cached origin view changed');
     }),
   },
   {
-    name: 'overlapping viewports agree across positive and negative cells',
+    name: 'cached positive and negative views retain matching overlapping scenery',
     async run({ page }) {
       const comparisons = await page.evaluate(async () => {
         const t = window.test, results = [];
-        for (const start of [-625.125, 113.125]) {
+        t.renderer.resize(768, 256);
+        const shift = 512 / t.renderer.getOptions().zoom;
+        const width = t.canvas.width, height = t.canvas.height;
+        const pixelShift = Math.round(512 * t.renderer.getOptions().pixelRatio);
+        // Upstream culls by object origin, so a long distant mountain can pop
+        // out when that origin crosses its 512-unit margin. These selected
+        // pairs retain the distant motifs that cover their shared viewport.
+        for (const start of [-625.125, 33.125]) {
+          t.renderer.render({ cameraX: start });
+          t.renderer.render({ cameraX: start + shift });
           t.renderer.render({ cameraX: start }); const left = await t.pixels();
-          // 80 pixels at 1000 world units / 256 vertical pixels = 312.5 units.
-          t.renderer.render({ cameraX: start + 312.5 }); const right = await t.pixels();
+          // Original paper is screen-aligned and repeats every 512 pixels.
+          // Shift one paper tile so the overlapping scene also shares its paper.
+          t.renderer.render({ cameraX: start + shift }); const right = await t.pixels();
           let total = 0, large = 0, count = 0;
-          for (let y = 0; y < 256; y++) for (let x = 0; x < 240; x++) for (let c = 0; c < 3; c++) {
-            const delta = Math.abs(left[(y * 320 + x + 80) * 4 + c] - right[(y * 320 + x) * 4 + c]);
+          for (let y = 0; y < height; y++) for (let x = 0; x < width - pixelShift; x++) for (let c = 0; c < 3; c++) {
+            const delta = Math.abs(left[(y * width + x + pixelShift) * 4 + c] - right[(y * width + x) * 4 + c]);
             total += delta; large += Number(delta > 8); count++;
           }
           results.push({ start, average: total / count, largeFraction: large / count });
@@ -70,39 +86,81 @@ export const renderingScenarios = [
     },
   },
   {
+    name: 'paper tiles repeat exactly at fractional pixel ratios',
+    createRenderer: false,
+    run: ({ page }) => page.evaluate(async () => {
+      const t = window.test;
+      // The original paper is a 512-CSS-pixel tile. Move the scene out of view
+      // so this tests paper sampling independently of path rasterization.
+      t.renderer = await t.api.createLandscape(t.canvas, {
+        seed: 'browser-validation', width: 768, height: 256, pixelRatio: 0.25, cameraY: -5000,
+      });
+      const pixels = await t.pixels(), width = t.canvas.width, height = t.canvas.height;
+      const shift = 128;
+      let differences = 0;
+      for (let y = 0; y < height; y++) for (let x = 0; x < width - shift; x++) for (let c = 0; c < 4; c++) {
+        differences += Number(pixels[(y * width + x) * 4 + c] !== pixels[(y * width + x + shift) * 4 + c]);
+      }
+      t.require(differences === 0, `Identical paper tiles differ in ${differences} channels at fractional pixel ratio`);
+    }),
+  },
+  {
     name: 'resize preserves scene settings and invalid updates are atomic',
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
-      t.renderer.render({ seed: 'resize-seed', mist: 0.6, cameraX: -200 });
-      t.renderer.resize(240, 180, 1.5);
-      t.require(t.canvas.width === 360 && t.canvas.height === 270, 'Wrong backing dimensions');
+      t.renderer.render({ seed: 'resize-seed', zoom: 1.5, cameraX: -200 });
+      t.renderer.resize(80, 60, 2);
+      t.require(t.canvas.width === 160 && t.canvas.height === 120, 'Wrong backing dimensions');
       const before = t.renderer.getOptions(), image = t.hash(await t.pixels());
-      t.require(before.seed === 'resize-seed' && before.cameraX === -200 && before.mist === 0.6, 'Resize reset scene options');
+      t.require(before.seed === 'resize-seed' && before.cameraX === -200 && before.zoom === 1.5, 'Resize reset scene options');
       let rejected = false;
-      try { t.renderer.render({ seed: 'should-not-apply', layers: 100 }); } catch { rejected = true; }
+      try { t.renderer.render({ seed: 'should-not-apply', zoom: 0 }); } catch { rejected = true; }
       t.require(rejected, 'Invalid render did not throw');
       t.require(JSON.stringify(before) === JSON.stringify(t.renderer.getOptions()), 'Invalid render partially changed options');
       t.renderer.render();
       t.require(t.hash(await t.pixels()) === image, 'Invalid render changed the image');
-      const copy = t.renderer.getOptions(); copy.paper[0] = 0; copy.ink[1] = 1; copy.seed = 'mutated';
+      const copy = t.renderer.getOptions(); copy.cameraX = 0; copy.zoom = 4; copy.seed = 'mutated';
       t.require(JSON.stringify(before) === JSON.stringify(t.renderer.getOptions()), 'Options expose mutable renderer state');
     }),
   },
   {
-    name: 'normal rendering submits one fullscreen draw with bounded uniforms and no CPU geometry or readback',
+    name: 'GPU compute creates brush vertices and cached camera redraws upload only uniforms',
     observeGPU: true,
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test, gpu = t.gpu;
-      const before = { ...gpu.counters }, writes = gpu.writes.length, draws = gpu.draws.length;
-      t.renderer.render({ cameraX: 111 });
-      t.require(gpu.counters.draw === before.draw + 1, 'Render must encode one fullscreen draw');
+      t.require(gpu.afterCreate.dispatchWorkgroups === 1, 'Initial scene did not dispatch brush generation');
+      t.require(gpu.afterCreate.beginComputePass === 1 && gpu.afterCreate.beginRenderPass === 2, 'Initial frame must compute brushes then render ink and paper');
+      t.require(gpu.initialDraws.length === 2, 'Initial frame must submit the ink and paper draws');
+      t.require(gpu.initialDraws[0][0] === 6 && gpu.initialDraws[0][1] > 0, 'Ink pass did not instance original path bounds');
+      t.require(gpu.initialDraws[1][0] === 3, 'Paper pass did not composite a fullscreen triangle');
+      const generated = gpu.buffers.filter(buffer => /^GPU brush (vertices|bounds)$/.test(buffer.label));
+      t.require(generated.length === 2, 'Missing generated brush vertex or bounds buffer');
+      for (const allocation of generated) {
+        t.require(allocation.usage & GPUBufferUsage.STORAGE, 'Generated geometry is not GPU storage');
+        t.require(!allocation.mappedAtCreation, 'Generated geometry was mapped for CPU initialization');
+        t.require(!gpu.writes.some(write => write.buffer === allocation.buffer), 'Expanded brush geometry was uploaded by the CPU');
+      }
+      t.require(gpu.counters.copyTextureToBuffer === 0 && gpu.counters.mapAsync === 0, 'Rendering used explicit GPU readback');
+      const before = { ...gpu.counters }, writes = gpu.writes.length, draws = gpu.draws.length, buffers = gpu.buffers.length;
+      t.renderer.render({ cameraY: t.renderer.getOptions().cameraY + 20 });
+      t.require(gpu.counters.dispatchWorkgroups === before.dispatchWorkgroups, 'Cached camera redraw recomputed brush geometry');
+      t.require(gpu.counters.beginRenderPass === before.beginRenderPass + 2, 'Camera redraw must render ink and paper');
+      t.require(gpu.counters.draw === before.draw + 2, 'Camera redraw must encode two rendering draws');
       t.require(gpu.counters.submit === before.submit + 1, 'Render must submit one frame');
-      t.require(gpu.draws[draws][0] === 3, 'Landscape must use a fullscreen triangle');
-      for (const name of ['createBuffer', 'createTexture', 'writeTexture', 'copyExternalImageToTexture', 'copyTextureToBuffer', 'mapAsync']) {
+      t.require(gpu.draws[draws][0] === 6 && gpu.draws[draws + 1][0] === 3, 'Camera redraw changed the rendering passes');
+      for (const name of ['createTexture', 'writeTexture', 'copyExternalImageToTexture', 'copyTextureToBuffer', 'mapAsync']) {
         t.require(gpu.counters[name] === before[name], `Unexpected ${name} during normal render`);
       }
-      t.require(gpu.writes.slice(writes).every(bytes => bytes <= 512), 'Render uploaded more than a small uniform block');
-      t.require(gpu.buffers.every(({ usage }) => !(usage & (GPUBufferUsage.VERTEX | GPUBufferUsage.INDEX | GPUBufferUsage.STORAGE))), 'Landscape uses CPU geometry or storage buffers');
+      t.require(gpu.writes.slice(writes).every(write => write.bytes <= 512), 'Camera redraw uploaded more than uniforms');
+      t.require(gpu.buffers.slice(buffers).every(({ usage }) => !(usage & GPUBufferUsage.STORAGE)), 'Camera redraw allocated new geometry storage');
+      t.require(gpu.buffers.every(({ usage }) => !(usage & (GPUBufferUsage.VERTEX | GPUBufferUsage.INDEX))), 'Landscape uploaded a CPU vertex or index mesh');
+      const expected = t.hash(await t.pixels());
+      const unchanged = { ...gpu.counters }, nextDraw = gpu.draws.length;
+      t.renderer.render();
+      t.require(gpu.counters.dispatchWorkgroups === unchanged.dispatchWorkgroups, 'Unchanged view recomputed brush geometry');
+      t.require(gpu.counters.beginRenderPass === unchanged.beginRenderPass + 1, 'Unchanged view repainted the cached ink target');
+      t.require(gpu.counters.draw === unchanged.draw + 1 && gpu.draws[nextDraw][0] === 3, 'Unchanged view must only composite cached ink with paper');
+      t.require(t.hash(await t.pixels()) === expected, 'Reusing the cached ink target changed the PNG');
     }),
   },
 ];

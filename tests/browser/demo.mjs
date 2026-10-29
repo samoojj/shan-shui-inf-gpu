@@ -5,24 +5,30 @@ export const demoScenarios = [{
   name: 'demo controls, keyboard and pointer pan, PNG export and mobile layout work',
   createRenderer: false,
   async run({ page, baseURL }) {
+    // Lower backing resolution keeps software GPU checks practical; UI sizes stay unchanged.
+    await page.addInitScript(() => {
+      if (location.pathname.startsWith('/examples/')) Object.defineProperty(window, 'devicePixelRatio', { get: () => 0.25 });
+    });
     await page.goto(`${baseURL}/examples/`);
     await page.waitForFunction(() => /Ready|Position/.test(document.querySelector('#status')?.textContent || ''));
     await page.getByLabel('Landscape seed', { exact: true }).fill('demo-check');
     await page.getByRole('button', { name: 'Generate', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#status').textContent.includes('demo-check'));
-    await page.getByLabel('Mist', { exact: true }).fill('0.75');
-    await page.waitForFunction(() => document.querySelector('#mist-value').value === '75%');
+    await page.getByLabel('Zoom', { exact: true }).fill('1.5');
+    await page.waitForFunction(() => document.querySelector('#zoom-value').value === '1.500×');
     await page.locator('#landscape').focus();
     await page.keyboard.press('ArrowRight');
-    await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Position 80'));
+    await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith(`Position ${Math.round(80 / 1.5)} ·`));
     await page.getByRole('button', { name: 'Reset view', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Position 0'));
+    assert.equal(await page.getByLabel('Zoom', { exact: true }).inputValue(), '1.142');
+    assert.equal(await page.locator('#zoom-value').textContent(), '1.142×');
     const bounds = await page.locator('#landscape').boundingBox();
     await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
     await page.mouse.down();
     await page.mouse.move(bounds.x + bounds.width / 2 + 80, bounds.y + bounds.height / 2, { steps: 3 });
     await page.mouse.up();
-    await page.waitForFunction(() => /Position -\d+/.test(document.querySelector('#status').textContent));
+    await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith(`Position ${Math.round(-80 / 1.142)} ·`));
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Save PNG', exact: true }).click();
     const download = await downloadPromise;
@@ -37,6 +43,10 @@ export const demoScenarios = [{
   name: 'a failed demo capture never replays settings over a newer rendered scene',
   createRenderer: false,
   async run({ page, baseURL }) {
+    // Lower backing resolution keeps software GPU checks practical; UI sizes stay unchanged.
+    await page.addInitScript(() => {
+      if (location.pathname.startsWith('/examples/')) Object.defineProperty(window, 'devicePixelRatio', { get: () => 0.25 });
+    });
     await page.goto(`${baseURL}/examples/`);
     await page.waitForFunction(() => /Ready|Position/.test(document.querySelector('#status')?.textContent || ''));
     await page.evaluate(() => {
@@ -61,7 +71,8 @@ export const demoScenarios = [{
 
     await page.evaluate(() => window.rejectPendingEncoding());
     await page.waitForFunction(() => !document.querySelector('#download').disabled);
-    await page.getByLabel('Mist', { exact: true }).fill('0.8');
+    await page.getByLabel('Zoom', { exact: true }).fill('1.8');
+    await page.waitForFunction(() => document.querySelector('#zoom-value').value === '1.800×');
     await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('Position'));
     assert.match(await page.locator('#status').textContent(), /Seed capture-later-seed$/,
       'An encoding failure replayed the earlier capture settings over a newer scene');

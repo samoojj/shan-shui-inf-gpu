@@ -53,7 +53,7 @@ export const lifecycleScenarios = [
         t.require(rejected, 'A lost device accepted capture');
         t.require(JSON.stringify(t.renderer.getOptions()) === before, 'A rejected render changed the lost scene');
         t.renderer.dispose();
-        t.renderer = await t.api.createLandscape(t.canvas, { width: 320, height: 256, seed: 'browser-validation' });
+        t.renderer = await t.api.createLandscape(t.canvas, { width: 320, height: 256, pixelRatio: 0.25, cameraY: 160, seed: 'browser-validation' });
         t.require(t.renderer.getStatus() === 'ready', 'Explicit recreation did not restore readiness');
         t.require(t.gpu.devices.at(-1) !== t.lostDevice, 'Recreation reused the destroyed device');
         t.require(t.hash(await t.pixels()) === t.hash(t.initial), 'Recreation changed the seeded scene');
@@ -93,7 +93,7 @@ export const lifecycleScenarios = [
       t.require(rejected, 'Disposed renderer accepted rendering');
       const old = t.renderer;
       for (let i = 0; i < 3; i++) {
-        const instance = await t.api.createLandscape(t.canvas, { width: 200, height: 160, seed: 'remount' });
+        const instance = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25, seed: 'remount' });
         let duplicate = false;
         try { await t.api.createLandscape(t.canvas); } catch { duplicate = true; }
         t.require(duplicate, 'Two renderers claimed one canvas');
@@ -112,8 +112,8 @@ export const lifecycleScenarios = [
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
       const outcomes = await Promise.allSettled([
-        t.api.createLandscape(t.canvas, { width: 200, height: 160 }),
-        t.api.createLandscape(t.canvas, { width: 200, height: 160 }),
+        t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 }),
+        t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 }),
       ]);
       if (outcomes[0].status === 'fulfilled') t.renderer = outcomes[0].value;
       if (outcomes[1].status === 'fulfilled') outcomes[1].value.dispose();
@@ -134,7 +134,7 @@ export const lifecycleScenarios = [
       finally { GPUAdapter.prototype.requestDevice = original; }
       t.require(error instanceof Error, 'Failed acquisition did not reject initialization');
       t.require(t.gpu.devices.length === 0, 'Failed acquisition retained a device');
-      t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160 });
+      t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 });
       t.require(t.renderer.getStatus() === 'ready', 'Failed acquisition retained canvas ownership');
     }),
   },
@@ -146,13 +146,13 @@ export const lifecycleScenarios = [
       const t = window.test, original = GPUDevice.prototype.createRenderPipelineAsync;
       GPUDevice.prototype.createRenderPipelineAsync = async () => { throw new Error('Deliberate pipeline compilation failure'); };
       let error;
-      try { await t.api.createLandscape(t.canvas, { width: 200, height: 160 }); } catch (cause) { error = cause; }
+      try { await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 }); } catch (cause) { error = cause; }
       finally { GPUDevice.prototype.createRenderPipelineAsync = original; }
       t.require(error instanceof Error, 'Pipeline compilation failure did not reject initialization');
       t.require(t.gpu.devices.length > 0, 'Failure test never acquired a native device');
       t.require(t.gpu.devices.every(device => t.gpu.destroyedDevices.has(device)), 'Failed initialization leaked its native device');
       t.require(t.gpu.buffers.every(({ buffer, device }) => t.gpu.destroyedBuffers.has(buffer) || t.gpu.destroyedDevices.has(device)), 'Failed initialization leaked GPU buffers');
-      t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160 });
+      t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 });
       t.require(t.renderer.getStatus() === 'ready', 'Pipeline failure retained canvas ownership');
     }),
   },
@@ -175,18 +175,18 @@ export const lifecycleScenarios = [
         }
         return result;
       };
-      try { initialized = await t.api.createLandscape(t.canvas, { width: 200, height: 160 }); }
+      try { initialized = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 }); }
       catch (cause) { error = cause; }
       finally {
         GPUQueue.prototype.submit = submit;
         initialized?.dispose();
       }
-      t.require(submitted && t.gpu.draws.length === 1, 'Initialization never submitted its first landscape frame');
+      t.require(submitted && t.gpu.draws.length === 2 && t.gpu.dispatches.length === 1, 'Initialization never submitted its brush generation and rendering passes');
       t.require(error instanceof Error, 'First-frame failure returned a ready renderer');
       t.require(/Deliberate first-frame failure/.test(error.message), 'Initialization lost the native failure reason');
       t.require(t.gpu.devices.every(device => t.gpu.destroyedDevices.has(device)), 'First-frame failure leaked its native device');
       t.require(t.gpu.buffers.every(({ buffer, device }) => t.gpu.destroyedBuffers.has(buffer) || t.gpu.destroyedDevices.has(device)), 'First-frame failure leaked GPU buffers');
-      t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160 });
+      t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 });
       t.require(t.renderer.getStatus() === 'ready', 'First-frame failure retained canvas ownership');
       t.require(t.gpu.devices.length === 2, 'Retry did not acquire a fresh native device');
     }),

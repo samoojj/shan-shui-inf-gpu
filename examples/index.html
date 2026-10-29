@@ -12,7 +12,7 @@
       <header>
         <div>
           <h1><span class="mark" lang="zh">山水</span>Shan shui</h1>
-          <p class="subtle">An endless study of mountains, water, and ink.</p>
+          <p class="subtle">A study of mountains, water, and ink.</p>
         </div>
         <p class="edition">A procedural landscape library</p>
       </header>
@@ -27,34 +27,22 @@
         <div class="controls">
           <div class="seed-control">
             <label for="seed">Landscape seed</label>
-            <div class="seed-row"><input id="seed" type="text" value="shan-shui" maxlength="160" spellcheck="false" autocomplete="off" /><button class="primary" type="submit">Generate</button></div>
+            <div class="seed-row"><input id="seed" type="text" value="1234" maxlength="96" spellcheck="false" autocomplete="off" /><button class="primary" type="submit">Generate</button></div>
           </div>
           <div>
-            <div class="label-row"><label for="layers">Mountain layers</label><output id="layers-value" for="layers">5</output></div>
-            <input id="layers" type="range" min="1" max="8" step="1" value="5" />
-          </div>
-          <div>
-            <div class="label-row"><label for="mist">Mist</label><output id="mist-value" for="mist">45%</output></div>
-            <input id="mist" type="range" min="0" max="1" step="0.01" value="0.45" />
-          </div>
-          <div>
-            <div class="label-row"><label for="vegetation">Vegetation</label><output id="vegetation-value" for="vegetation">55%</output></div>
-            <input id="vegetation" type="range" min="0" max="1" step="0.01" value="0.55" />
-          </div>
-          <div>
-            <div class="label-row"><label for="zoom">Zoom</label><output id="zoom-value" for="zoom">1.00×</output></div>
-            <input id="zoom" type="range" min="0.5" max="2" step="0.05" value="1" />
+            <div class="label-row"><label for="zoom">Zoom</label><output id="zoom-value" for="zoom">1.142×</output></div>
+            <input id="zoom" type="range" min="0.25" max="4" step="0.001" value="1.142" />
           </div>
         </div>
         <div class="actions">
           <button id="randomize" type="button">Another landscape</button>
           <button id="reset" type="button">Reset view</button>
           <button id="download" type="button">Save PNG</button>
-          <p class="hint">The same seed brings you back to the same landscape.</p>
+          <p class="hint">Choose a seed and explore its landscape.</p>
         </div>
       </form>
       <footer>
-        <p>Inspired by <a href="https://github.com/LingDong-/shan-shui-inf">Lingdong Huang’s shan-shui</a>.</p>
+        <p>Based on <a href="https://github.com/LingDong-/shan-shui-inf">Lingdong Huang’s shan-shui</a>.</p>
         <p>Explore by seed · Save a landscape as PNG</p>
       </footer>
     </main>

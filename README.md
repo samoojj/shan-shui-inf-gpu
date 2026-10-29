@@ -1,21 +1,21 @@
 # Shan shui GPU
 
-A TypeScript library for seeded Chinese ink landscapes, inspired by
-[Lingdong Huang’s shan-shui](https://github.com/LingDong-/shan-shui-inf) and the
-[`samoojj/shan-shui-inf-gpu` fork](https://github.com/samoojj/shan-shui-inf-gpu).
-Mountains, brush textures, vegetation, and water are generated in native WGSL
-shaders through WebGPU and [vgpu](https://github.com/vercel-labs/vgpu) **0.6.0**.
-The library is independent of React and Next.js; `vgpu` is its rendering dependency.
+A TypeScript library port of [Lingdong Huang’s shan-shui](https://github.com/LingDong-/shan-shui-inf)
+that preserves the original landscape construction and uses native WebGPU through
+[vgpu](https://github.com/vercel-labs/vgpu) **0.6.0** to generate brush geometry and
+render it. It includes the original mountains, rocks, eight tree styles,
+buildings, figures, boats, and water strokes.
 
-This is an artistic reimplementation. It does not reproduce the original SVG
-paths, seed outputs, or complete catalog of tree and architectural styles.
-Output is a raster canvas, suitable for a background, interactive landscape,
-or PNG export. The WebGPU implementation is not pixel-identical to the earlier
-WebGL renderer.
+The implementation is hybrid. The CPU runs the original seeded planner,
+recursive motif construction, and topology decisions. GPU compute performs
+texture displacement, stroke expansion, and drawn leaf/blob geometry; GPU
+rendering composites the ordered paths and original paper pattern. This retains
+the original method while moving substantive generation and rendering work to
+the GPU. Output is a raster canvas with PNG capture.
 
 ## Build and try it
 
-Use Node.js 22 or newer. From this repository’s root:
+Use Node.js 22 or newer:
 
 ```sh
 npm install
@@ -24,27 +24,24 @@ npm run demo
 ```
 
 Open [localhost:4173/examples/](http://localhost:4173/examples/) in a browser with
-WebGPU support. WebGPU requires a secure context: use HTTPS in production;
-localhost is suitable for development. Browser support alone does not guarantee
-that the current device exposes a usable GPU adapter.
+WebGPU support and an available adapter. WebGPU requires a secure context: use
+HTTPS in production; localhost works for development.
 
-The example supports seeds, horizontal dragging and keyboard panning, mist,
-vegetation, mountain layers, zoom, and PNG export. It shows a loading state while
-initializing and renders only after input or resize; there is no automatic
-animation.
+The example supports seed selection, horizontal dragging, keyboard panning,
+zoom, reset, and PNG export. Generating a seed returns the view to the original
+scale. It renders on input or resize, without a continuous animation loop.
 
-The package has not been published to a registry. To use the built package in
-another project, install it from disk:
+The package has not been published to a registry. Build it, then install it into
+another project from disk:
 
 ```sh
 npm install /absolute/path/to/shan-shui-inf-gpu
 ```
 
-Build the package before installing it from disk. The build resolves and prepares
-the WGSL module graph, emits TypeScript declarations, and bundles the browser
-entry point. `dist/index.js` includes the vgpu browser runtime; it does not parse
-or resolve WGSL in the browser. Consumers of the built library do not need a WGSL
-loader.
+`dist/index.js` is a browser-ready ES module containing the library and vgpu
+runtime. The build prepares the native WGSL modules and their binding reflection;
+the browser bundle does not include the WGSL parser/resolver. Consumers need no
+WGSL loader. TypeScript declarations accompany the bundle.
 
 ## Use the library
 
@@ -53,112 +50,104 @@ import { createLandscape } from "shan-shui-gpu";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#landscape")!;
 const landscape = await createLandscape(canvas, {
-  seed: "quiet-morning",
+  seed: "1234",
   width: 1200,
   height: 700,
   pixelRatio: 1,
-  layers: 5,
-  mist: 0.45,
+  zoom: 1.142,
 });
 
 // Creation resolves after setup and the initial draw.
 landscape.render({ cameraX: 400 });
-landscape.render({ seed: "another-valley", vegetation: 0.8 });
+landscape.render({ seed: "quiet-morning", cameraX: 0 });
 landscape.resize(900, 600, 1.5);
 
 const image = await landscape.capture();
-// image.blob is the PNG; image.options describes the captured scene.
+// image.blob is the PNG; image.options describes its captured settings.
 
 landscape.dispose();
 ```
 
-For a browser without an application bundler, import `../dist/index.js` relative
-to your HTML file and serve the files over HTTP on localhost or HTTPS elsewhere.
-Importing the package is safe during server-side rendering; GPU initialization
-happens only when `createLandscape()` is called. In React or Next.js, initialize
-inside a client effect and dispose the renderer on cleanup. If initialization
-finishes after the effect was cleaned up, dispose that returned renderer too.
-
-**Pre-1.0 change:** `createLandscape()` now returns a promise. Await it before
-calling renderer methods. `isWebGPUSupported()` replaces the previous WebGL2 probe
-and is asynchronous as well. There is no automatic WebGL fallback.
+Without an application bundler, import `../dist/index.js` from an example module
+and serve the files over localhost HTTP or HTTPS. Importing the package is safe
+during server-side rendering; GPU initialization begins at `createLandscape()`.
+For React or Next.js, create the renderer in a client effect and dispose it on
+cleanup. Also dispose a renderer whose asynchronous initialization finishes after
+the effect has already been cleaned up.
 
 ### Options
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `seed` | `"shan-shui"` | String or finite number. Determines the procedural world. |
-| `width`, `height` | Canvas dimensions | Integer logical dimensions, `1`–`16384`. Set canvas CSS dimensions separately. |
-| `pixelRatio` | `1` | Backing resolution multiplier, `0.25`–`4`. Higher values increase pixel cost. |
-| `cameraX`, `cameraY` | `0`, `0` | World-space camera offset, within ±1,000,000. |
-| `zoom` | `1` | Magnification, `0.25`–`4`. At `1`, the view is 1,000 world units high. |
-| `layers` | `5` | Integer mountain layer count, `1`–`8`. |
-| `roughness` | `0.55` | Terrain roughness, `0`–`1`. |
-| `inkDensity` | `0.7` | Ink strength, `0`–`1`. |
-| `mist` | `0.45` | Atmospheric softness, `0`–`1`. |
-| `vegetation` | `0.55` | Vegetation density, `0`–`1`. |
-| `water` | `0.5` | Water detail strength, `0`–`1`. |
-| `paper` | `[0.96, 0.95, 0.91]` | Paper RGB color, each channel `0`–`1`. |
-| `ink` | `[0.12, 0.15, 0.14]` | Ink RGB color, each channel `0`–`1`. |
+| `seed` | `"1234"` | String or finite number; converted to a string and URL-encoded for the original seed routine. Maximum encoded length: 96 characters. |
+| `width`, `height` | Canvas dimensions | Integer logical dimensions, `1`–`16384`. If the canvas dimension is zero, the fallback is `1200` × `700`. Set CSS dimensions separately. |
+| `pixelRatio` | `1` | Backing resolution multiplier, `0.25`–`4`. |
+| `cameraX`, `cameraY` | `0`, `0` | Offset in original drawing coordinates, within ±8192. Positive y points downward. |
+| `zoom` | `1.142` | Logical screen pixels per drawing unit, `0.25`–`4`. The visible extent is `width / zoom` by `height / zoom`. |
 
-`render(patch?)` validates and applies a partial option update, then draws.
-`resize(width, height, pixelRatio?)` updates the drawing dimensions and draws.
-`getOptions()` returns a copy of the resolved options. `getStatus()` returns
-`"ready"`, `"device-lost"`, `"error"`, or `"disposed"`.
-`subscribe(listener)` delivers the current `{ status, error }` immediately and
-subsequent readiness changes; it returns an unsubscribe function.
-`capture(patch?)` returns a promise for a PNG and its scene metadata.
-`dispose()` releases the renderer and its subscriptions and is safe to repeat.
+`DEFAULT_OPTIONS` is exported; its explicit dimensions are 1200 × 700.
+The original composition determines vegetation, mountain placement, water,
+colors, and ink density. Earlier approximation controls such as `layers`,
+`mist`, and `vegetation` are no longer accepted. Unknown options throw.
 
-Backing resolution is capped at 8,388,608 pixels and 8192 pixels per dimension
-(or the device limit, if lower), scaling down both dimensions together. Inspect
-`canvas.width` and `canvas.height` for the actual render/export dimensions;
-`getOptions()` retains the requested logical size and pixel ratio.
+| Method | Behavior |
+| --- | --- |
+| `render(patch?)` | Validates a partial update and submits a draw. May generate newly requested landscape chunks on the CPU. |
+| `resize(width, height, pixelRatio?)` | Updates dimensions and draws. |
+| `getOptions()` | Returns a copy of the resolved settings. |
+| `getStatus()` | Returns `"ready"`, `"device-lost"`, `"error"`, or `"disposed"`. |
+| `subscribe(listener)` | Delivers `{ status, error }` immediately and on state changes; returns an unsubscribe function. |
+| `capture(patch?)` | Draws and returns a promise for `{ blob, width, height, options }`. |
+| `dispose()` | Releases resources and subscriptions; safe to repeat. |
 
-### Browser support and lifecycle
+Backing resolution is capped at 8,388,608 pixels and 8192 pixels per dimension,
+or the device limit if lower. Both dimensions scale down together. Read
+`canvas.width`/`height` or capture metadata for actual output dimensions;
+`getOptions()` retains the requested logical dimensions and pixel ratio. This
+render-target cap does not cap the number of landscape commands in memory.
+The visible width (`width / zoom`) is limited to 8192 drawing units and is
+validated before generation, so a very wide canvas at minimum zoom cannot
+request tens of thousands of world units in one call.
 
-`createLandscape()` rejects if WebGPU is unavailable, initialization or shader
-compilation fails, resources cannot be allocated, or options are invalid. Catch
-initialization failures and show a fallback suitable for your application.
+### Lifecycle and browser support
+
+`createLandscape()` and `isWebGPUSupported()` are asynchronous. Initialization
+rejects if options are invalid, WebGPU is unavailable, or device, pipeline, or
+resource setup fails. Catch this and show a suitable fallback.
 
 ```ts
 import { isWebGPUSupported } from "shan-shui-gpu";
 
-const supported = await isWebGPUSupported();
-// This optional probe does not guarantee that later initialization will succeed.
+if (await isWebGPUSupported()) {
+  // Adapter availability is a preliminary check; creation can still fail.
+}
 ```
 
-The renderer owns its GPU device and canvas surface. Use a dedicated canvas and
-do not share it with another renderer. Subscribe when your UI needs to reflect
-the session’s actual readiness:
+A session owns its canvas until disposed; concurrent sessions cannot use the
+same canvas. Subscribe to readiness rather than inferring it from browser events:
 
 ```ts
 const unsubscribe = landscape.subscribe(({ status, error }) => {
-  // Update your application's readiness indicator or fallback.
-  console.log(status);
-  if (error) console.error(error);
+  saveButton.disabled = status !== "ready";
+  if (error) statusElement.textContent = error.message;
 });
-// Later, detach this observer without disposing the landscape:
-unsubscribe();
 ```
 
-Device loss is terminal for that session. It reports `"device-lost"` with an
-error; `render()` and `resize()` throw, and `capture()` rejects further work.
-Dispose the session and await
-`createLandscape()` again to acquire a new device and recreate resources. An
-`"error"` state likewise requires disposal and recreation. There is no WebGL-style
-context-restoration event or automatic recovery of an old GPU device. Listener
-exceptions are reported without changing renderer readiness.
+Device loss and rendering errors are terminal for a session. Further render and
+resize calls throw; capture rejects. Dispose it and await a new
+`createLandscape()` call to start again. There is no automatic restoration or
+fallback backend. `unsubscribe()` detaches a listener; `dispose()` also releases
+all subscriptions.
 
 Resize is explicit. A `ResizeObserver` can measure CSS dimensions and call
-`resize()`. Coalesce frequent pointer and resize events with
-`requestAnimationFrame`; the library does not install an animation loop or
-change page styles. The example demonstrates both behaviors.
+`resize()`. The demo coalesces pointer and resize events with
+`requestAnimationFrame`; the library installs no page event handlers or animation
+loop.
 
-### OffscreenCanvas
+### OffscreenCanvas and capture
 
-The same interface accepts an `OffscreenCanvas` where the browser supports WebGPU
-in workers. Transfer a canvas before creating a renderer:
+The same interface accepts `OffscreenCanvas` where WebGPU is available in workers.
+Transfer an HTML canvas before initializing its renderer:
 
 ```ts
 // Main thread
@@ -170,16 +159,14 @@ worker.postMessage({ canvas: offscreen }, [offscreen]);
 ```
 
 ```ts
-// landscape-worker.js
+// landscape-worker.js; adjust the module path for your project.
 import { createLandscape } from "./dist/index.js";
 
 self.onmessage = async ({ data }) => {
   let landscape;
   try {
     landscape = await createLandscape(data.canvas, {
-      seed: "worker-landscape",
-      width: 1200,
-      height: 700,
+      seed: "1234", width: 1200, height: 700,
     });
     const image = await landscape.capture();
     self.postMessage({ blob: image.blob, options: image.options });
@@ -191,103 +178,117 @@ self.onmessage = async ({ data }) => {
 };
 ```
 
-### Export
+`capture(patch?)` applies the requested settings, draws, and snapshots the PNG and
+its metadata together. Calls made after loss, failure, or disposal reject
+without applying the patch. Once encoding starts, subsequent renders or disposal
+do not relabel that image. Use `image.options.seed` for the filename, even if the
+user changes seeds while encoding. GPU submission or encoding errors reject.
+Normal draws do not read image pixels back to JavaScript; PNG capture does.
+There is no SVG export.
 
-Capture works with HTMLCanvasElement and OffscreenCanvas, including after
-asynchronous application work. The renderer owns rendering and capture timing:
+## Fidelity, determinism, and execution
 
-```ts
-const image = await landscape.capture({ seed: "evening-river" });
-// image.blob is a PNG; image.width/height are its actual backing dimensions.
-// image.options describes the captured scene, even if a newer frame exists.
-// Upload, download, or display image.blob using your application's UI.
-```
+The archived source is the official upstream commit
+[`9f754d2b2e73495db7883d4d4055a7b0903b0454`](https://github.com/LingDong-/shan-shui-inf/tree/9f754d2b2e73495db7883d4d4055a7b0903b0454),
+with HTML Git blob `f0d1da751455f99b46756fcbdde8b02420f27d31`, verified against
+the original upstream checkout. The port preserves its mutable PRNG's JavaScript double
+arithmetic, lazy Perlin table initialization, random consumption, motif
+construction, and painter ordering. Random state is private to each scene;
+the library does not replace the application's `Math.random`.
 
-The optional patch is validated and applied before capture. A capture initiated
-while the device is lost, the session has failed, or the renderer is disposed
-rejects without applying the patch. Invalid settings and encoding failures also
-reject. Once encoding has started, later renders or disposal do not change that
-capture's image or metadata. Use `image.options.seed` for filenames rather than
-reading the renderer's current seed after encoding.
+Fresh sessions with the same seed and sequence of view requests reproduce the
+same composition. The original planner extends a cached world in requested
+chunk order: exploring new regions in a different order can produce different
+later content. This is not a position-hashed, order-independent infinite world.
+A capture records view settings, not the history needed to reconstruct every
+previously explored chunk. Changing to a different seed starts a fresh scene. An explicit empty string is
+also deterministic; the original application instead uses the current time
+when its seed query parameter is empty.
 
-Normal rendering does not read image pixels back to JavaScript. Explicit PNG
-capture incurs a readback. SVG export is not supported.
+The original also culls chunks by their anchor position with a 512-unit margin,
+not by their full shape. A long distant mountain can therefore disappear
+abruptly while panning when the camera reaches its anchor plus 512 units, even
+if part of the mountain would still be visible. This upstream behavior is retained.
 
-## GPU work and performance
+The CPU builds control paths and performs branch decisions, rejection sampling,
+curve sampling, and geometry-dependent topology. In particular, `tree07` asks
+`blob({ ret: 1 })` for points and recursively triangulates them on the CPU; that
+case cannot defer its points until after the grammar has run. Ordinary drawn
+blobs, stroke contours, and texture jitter are generated on the GPU from their
+commands. The rasterizer preserves ordered nonzero fills, outlines, white
+occlusion masks, and alpha compositing, then multiplies the result by the
+original mirrored 512 × 512 paper pattern.
 
-The implementation uses vgpu’s `effect`, `surface`, and `frame` with a prepared
-native WGSL shader. One fullscreen triangle produces the landscape. Seeded
-world-coordinate noise determines terrain and details. JavaScript handles
-validation, seed hashing, sizing, resource lifecycle, and uniform updates; it
-does not build landscape geometry, generate SVG paths, or rasterize pixels.
-Panning changes uniform data and does not accumulate generated chunks in memory.
+GPU `f32` calculations and raster antialiasing differ from JavaScript doubles
+and browser SVG rasterization. Exact pixel identity is not assumed. The original
+“Pizza Hut” label is retained using bundled Liberation Sans vector outlines in
+place of Verdana; this is an explicit font substitution. Pixel comparison with
+the upstream reference must report its viewport, seed/history, and measured
+tolerance rather than claim visual equivalence from reproducibility alone.
 
-The authored shaders live in `src/shaders/*.wgsl`. Pure WGSL modules own painting,
-water, and mountain composition; the entry shader owns resource bindings. The
-build resolves imports and prepares reflection before bundling. No GLSL source,
-GLSL-to-WGSL translator, or browser-time WGSL parser is part of rendering.
+Generating a new seed or new chunks costs CPU time and allocates control data.
+Cached chunks remain for the session; wider exploration increases memory use.
+GPU cost depends on command count, brush samples, overlapping paths, and backing
+resolution. Start with pixel ratio 1 and redraw only when needed. No hardware
+speedup or frame-rate guarantee has been established. Software WebGPU results
+validate tested behavior, not hardware performance.
 
-GPU work scales with backing pixel count and mountain layers. Start at pixel
-ratio `1`, use fewer layers on constrained devices, and redraw only when needed.
-WebGPU can use a software adapter; availability alone does not prove physical
-GPU acceleration. Software-driver checks do not establish frame rate or battery
-performance on hardware. Profile your actual devices and intended canvas sizes.
+The source audits explain the original method with line citations:
 
-The same seed and options reproduce a scene on the same backend and
-implementation, independent of the order in which you pan. Floating-point
-shader differences can produce different pixels between GPU vendors or between
-WebGPU and the prior WebGL implementation. Coordinates are bounded to preserve
-usable precision; this is a large procedural world rather than an
-unbounded-precision scroll.
-
-## Attribution and license
-
-MIT. The original algorithm and visual approach are by Lingdong Huang,
-copyright 2018. See the included license notice. The referenced fork was
-reviewed at commit
-[`9f754d2b2e73495db7883d4d4055a7b0903b0454`](https://github.com/samoojj/shan-shui-inf-gpu/tree/9f754d2b2e73495db7883d4d4055a7b0903b0454),
-which still uses CPU-generated SVG. This package implements a new shader
-renderer for that landscape-painting approach. vgpu is a separate MIT-licensed
-dependency from Vercel Labs; its bundled code's notice is retained in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-The images in `screenshots/` are historical examples from the original SVG
-renderer, retained for reference; they are not output from this GPU renderer.
+- [Landscape planning and terrain](docs/original-landscape.md)
+- [Drawing primitives and randomness](docs/original-primitives.md)
+- [All eight tree constructions](docs/original-trees.md)
+- [Buildings, figures, boats, and water](docs/original-motifs.md)
+- [Current module ownership and execution](docs/architecture.md)
 
 ## Verification
+
+See [the verification report](docs/verification.md) for the source oracle, GPU
+coordinate checks, image-comparison procedure and measured limitations.
 
 ```sh
 npm test
 npm run check:shaders
+npm run test:gpu
 npx playwright install chromium
 npm run test:browser
+npm run reference
+npm run compare:reference
 npm pack --dry-run
 ```
 
-`check:shaders` resolves the complete native WGSL module graph and requires a
-WebGPU device to validate it. It fails rather than silently accepting a parse-only
-check. Diagnose a headless machine with `npm exec --no -- vgpu doctor`; if no
-adapter is available, `npm exec --no -- vgpu install-software-renderer` installs
-vgpu's verified software renderer for local validation.
+`npm run reference` runs the archived CPU application separately, verifies its
+source identity, and records full scenes plus 23 isolated primitive fixtures.
+`npm run compare:reference` captures the GPU port at the same seed and view,
+writes paired images and per-channel error metrics, and records adapter identity.
+`npm run test:gpu` checks GPU noise, expanded coordinates, and SVG fill/stroke
+semantics against the pinned source; see [GPU tests](https://github.com/samoojj/shan-shui-inf-gpu/blob/codex/gpu-landscape-library/tests/gpu/README.md).
+See [the reference harness](https://github.com/samoojj/shan-shui-inf-gpu/blob/codex/gpu-landscape-library/tests/reference/README.md) for seeds, native-scale
+crops, output artifacts, and exact-repeat checks. Its original SVG/pixel output
+is the comparison target; a repeatable GPU image alone does not prove a faithful
+port.
 
-For shader development, install the official agent skill with
-`npx skills add vercel-labs/vgpu --agent codex` and consult the documentation
-bundled with the pinned library, for example
-`npm exec --no -- vgpu docs cat shader-workflow`. Edit the `.wgsl` modules, rebuild,
-validate, and inspect actual rendered pixels; generated bundle contents are never
-the source of shader edits.
-
-To use an installed Chromium and explicitly enable software WebGPU for tests:
+Use an installed Chromium and software WebGPU when needed:
 
 ```sh
 CHROMIUM_EXECUTABLE=/usr/bin/chromium SWIFTSHADER=1 npm run test:browser
+CHROMIUM_EXECUTABLE=/usr/bin/chromium npm run reference
 ```
 
-Browser scenarios use fresh renderers and exercise actual shader output,
-seed repeatability, panning, sizing, lifecycle, HTML/worker PNG capture, and demo
-controls. Software WebGPU checks verify the tested behavior; they do not establish
-hardware speedup, a frame-rate guarantee, or parity with the old WebGL renderer.
+Shader validation requires a WebGPU device. Diagnose availability with
+`npm exec --no -- vgpu doctor`; the installed vgpu documentation describes its
+software renderer. Build preparation alone is not device validation. For shader
+changes, edit the native `.wgsl` files, rebuild, validate, and inspect rendered
+results. The strict build and tests should be run separately from the reference
+capture so their provenance remains clear.
 
-Use `BROWSER_TEST_FILTER='capture' npm run test:browser` to run matching browser
-scenarios. See [the architecture guide](docs/architecture.md) for module ownership,
-lifecycle invariants, and guidance for changing landscape composition.
+## Attribution and license
+
+The original algorithm and source are MIT-licensed, copyright 2018 Lingdong
+Huang; see [LICENSE](LICENSE). Ported composition modules retain that attribution
+and source locations. vgpu is an MIT-licensed dependency from Vercel Labs; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The signage outlines derive from
+Liberation Sans under the [SIL Open Font License](reference/font-license.txt).
+
+Images in `screenshots/` are historical output of the original SVG application.
+They are retained as references and do not demonstrate this renderer's output.

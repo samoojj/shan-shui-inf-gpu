@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 /** Every scenario owns its page, canvas, renderer, instrumentation, and teardown. */
 export async function runScenario(browser, baseURL, scenario) {
   const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
+  page.setDefaultTimeout(120000);
+  page.setDefaultNavigationTimeout(120000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   try {
@@ -28,7 +30,7 @@ export async function runScenario(browser, baseURL, scenario) {
         } finally { bitmap.close(); }
       };
       const restores = [];
-      const gpu = { devices: [], adapterInfo: [], errors: [], counters: {}, writes: [], draws: [], buffers: [], destroyedDevices: new Set(), destroyedBuffers: new Set(), restore() { for (const restore of restores.reverse()) restore(); } };
+      const gpu = { devices: [], adapterInfo: [], errors: [], counters: {}, writes: [], draws: [], dispatches: [], buffers: [], afterCreate: null, initialDraws: [], destroyedDevices: new Set(), destroyedBuffers: new Set(), restore() { for (const restore of restores.reverse()) restore(); } };
       const wrap = (prototype, name, replacement) => {
         const original = prototype[name];
         prototype[name] = replacement(original);
@@ -47,18 +49,22 @@ export async function runScenario(browser, baseURL, scenario) {
           wrap(prototype, name, original => function (...args) {
             gpu.counters[name]++;
             const result = original.apply(this, args);
-            if (name === 'createBuffer') gpu.buffers.push({ buffer: result, device: this, usage: args[0].usage });
+            if (name === 'createBuffer') gpu.buffers.push({ buffer: result, device: this, ...args[0] });
             if (name === 'writeBuffer') {
               const data = args[2];
-              gpu.writes.push(args[4] === undefined ? data.byteLength : args[4] * (data.BYTES_PER_ELEMENT || 1));
+              gpu.writes.push({ buffer: args[0], bytes: args[4] === undefined ? data.byteLength : args[4] * (data.BYTES_PER_ELEMENT || 1) });
             }
             if (name === 'draw') gpu.draws.push(args);
+            if (name === 'dispatchWorkgroups') gpu.dispatches.push(args);
             return result;
           });
         };
-        for (const name of ['createBuffer', 'createTexture', 'createRenderPipelineAsync']) watch(GPUDevice.prototype, name);
+        for (const name of ['createBuffer', 'createTexture', 'createRenderPipelineAsync', 'createComputePipelineAsync']) watch(GPUDevice.prototype, name);
         for (const name of ['submit', 'writeBuffer', 'writeTexture', 'copyExternalImageToTexture']) watch(GPUQueue.prototype, name);
         watch(GPURenderPassEncoder.prototype, 'draw');
+        watch(GPUComputePassEncoder.prototype, 'dispatchWorkgroups');
+        watch(GPUCommandEncoder.prototype, 'beginComputePass');
+        watch(GPUCommandEncoder.prototype, 'beginRenderPass');
         watch(GPUCommandEncoder.prototype, 'copyTextureToBuffer');
         watch(GPUBuffer.prototype, 'mapAsync');
         wrap(GPUDevice.prototype, 'destroy', original => function (...args) { gpu.destroyedDevices.add(this); return original.apply(this, args); });
@@ -67,7 +73,11 @@ export async function runScenario(browser, baseURL, scenario) {
       const test = window.test = { api, canvas, require, hash, decodePNG, renderer: null, initial: null, gpu };
       test.pixels = async () => (await decodePNG((await test.renderer.capture()).blob)).pixels;
       if (createRenderer) {
-        test.renderer = await api.createLandscape(canvas, { seed: 'browser-validation', width: 320, height: 256 });
+        // Keep the original logical view while limiting software-rendered pixels.
+        // Full-size fidelity comparisons are separate from these API scenarios.
+        test.renderer = await api.createLandscape(canvas, { seed: 'browser-validation', width: 320, height: 256, pixelRatio: 0.25, cameraY: 160 });
+        gpu.afterCreate = { ...gpu.counters };
+        gpu.initialDraws = gpu.draws.slice();
         test.initial = await test.pixels();
       }
     }, { createRenderer: scenario.createRenderer !== false, observeGPU: !!scenario.observeGPU });
