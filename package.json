@@ -1,0 +1,22 @@
+{
+  "name": "shan-shui-gpu",
+  "version": "0.1.0",
+  "description": "Seeded Chinese ink landscapes generated entirely in WebGL2 shaders.",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/samoojj/shan-shui-inf-gpu.git" },
+  "sideEffects": false,
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "src", "examples", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "test:browser": "npm run build && node tests/browser.mjs",
+    "demo": "npm run build && node scripts/serve.mjs",
+    "prepack": "npm run build"
+  },
+  "devDependencies": { "@playwright/test": "^1.58.2", "typescript": "^5.9.3" },
+  "engines": { "node": ">=22" }
+}

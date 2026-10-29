@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4f1e8" />
+    <title>Shan shui — a landscape in ink</title>
+    <style>
+      :root { color-scheme: light; --paper: #f4f1e8; --ink: #27352f; --muted: #60685e; --line: #c8c7b8; --accent: #994d38; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 system-ui, sans-serif; }
+      main { width: min(1500px, 100%); padding: 32px clamp(18px, 4vw, 64px) 48px; margin: auto; }
+      header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 24px; }
+      h1 { font: 400 clamp(36px, 5vw, 62px)/1.1 Georgia, serif; margin: 0 0 12px; letter-spacing: -.035em; }
+      .mark { font-size: .75em; color: var(--accent); margin-right: 14px; letter-spacing: .08em; }
+      p { margin: 0; }
+      .subtle, .hint { color: var(--muted); }
+      .hint { font-size: 13px; }
+      .edition { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; white-space: nowrap; }
+      .viewport { border-block: 1px solid var(--line); background: #f5f2e8; }
+      canvas { display: block; width: 100%; height: clamp(340px, 56vh, 680px); cursor: grab; touch-action: pan-y; }
+      canvas.dragging { cursor: grabbing; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+      .canvas-caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 0 22px; }
+      #status { min-height: 1.55em; }
+      .controls { display: grid; grid-template-columns: minmax(240px, 1.5fr) repeat(4, minmax(120px, 1fr)); gap: 22px; align-items: end; }
+      label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .03em; margin-bottom: 8px; }
+      .label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+      output { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+      .seed-row, .actions { display: flex; align-items: center; gap: 8px; }
+      input[type=text] { min-width: 0; width: 100%; border: 1px solid var(--line); border-radius: 3px; padding: 9px 10px; background: transparent; color: inherit; font: inherit; }
+      input[type=range] { display: block; width: 100%; height: 40px; margin: 0; accent-color: var(--ink); }
+      button { border: 1px solid var(--line); border-radius: 3px; background: transparent; color: inherit; padding: 9px 13px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+      button:hover { border-color: var(--ink); background: #e8e6db; }
+      button:disabled { opacity: .5; cursor: default; }
+      .primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+      .primary:hover { background: #394b40; color: var(--paper); }
+      .actions { margin-top: 24px; flex-wrap: wrap; }
+      .actions .hint { margin-left: auto; }
+      footer { display: flex; gap: 24px; justify-content: space-between; flex-wrap: wrap; border-top: 1px solid var(--line); margin-top: 36px; padding-top: 18px; font-size: 12px; color: var(--muted); }
+      a { color: inherit; text-underline-offset: 3px; }
+      @media (max-width: 950px) { .controls { grid-template-columns: repeat(4, 1fr); } .seed-control { grid-column: 1 / -1; max-width: 420px; } }
+      @media (max-width: 540px) { header { display: block; } .edition { margin-top: 18px; } .controls { grid-template-columns: repeat(2, 1fr); gap: 16px; } .actions .hint { width: 100%; margin-left: 0; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1><span class="mark" lang="zh">山水</span>Shan shui</h1>
+          <p class="subtle">An endless study of mountains, water, and ink.</p>
+        </div>
+        <p class="edition">A procedural landscape library</p>
+      </header>
+      <div class="viewport">
+        <canvas id="landscape" width="1200" height="600" tabindex="0" aria-label="Procedural Chinese ink landscape. Drag horizontally or use the left and right arrow keys to explore." aria-describedby="canvas-help">This landscape requires a browser with WebGL2 support.</canvas>
+      </div>
+      <div class="canvas-caption hint">
+        <p id="canvas-help">Drag to explore · Arrow keys to pan · Home to return</p>
+        <p id="status" role="status" aria-live="polite">Preparing the landscape…</p>
+      </div>
+      <form id="controls" aria-label="Landscape settings">
+        <div class="controls">
+          <div class="seed-control">
+            <label for="seed">Landscape seed</label>
+            <div class="seed-row"><input id="seed" type="text" value="shan-shui" maxlength="160" spellcheck="false" autocomplete="off" /><button class="primary" type="submit">Generate</button></div>
+          </div>
+          <div>
+            <div class="label-row"><label for="layers">Mountain layers</label><output id="layers-value" for="layers">5</output></div>
+            <input id="layers" type="range" min="1" max="8" step="1" value="5" />
+          </div>
+          <div>
+            <div class="label-row"><label for="mist">Mist</label><output id="mist-value" for="mist">45%</output></div>
+            <input id="mist" type="range" min="0" max="1" step="0.01" value="0.45" />
+          </div>
+          <div>
+            <div class="label-row"><label for="vegetation">Vegetation</label><output id="vegetation-value" for="vegetation">55%</output></div>
+            <input id="vegetation" type="range" min="0" max="1" step="0.01" value="0.55" />
+          </div>
+          <div>
+            <div class="label-row"><label for="zoom">Zoom</label><output id="zoom-value" for="zoom">1.00×</output></div>
+            <input id="zoom" type="range" min="0.5" max="2" step="0.05" value="1" />
+          </div>
+        </div>
+        <div class="actions">
+          <button id="randomize" type="button">Another landscape</button>
+          <button id="reset" type="button">Reset view</button>
+          <button id="download" type="button">Save PNG</button>
+          <p class="hint">The same seed brings you back to the same landscape.</p>
+        </div>
+      </form>
+      <footer>
+        <p>Inspired by <a href="https://github.com/LingDong-/shan-shui-inf">Lingdong Huang’s shan-shui</a>.</p>
+        <p>WebGL2 · Generated on the GPU · Drawn only when the view changes</p>
+      </footer>
+    </main>
+    <script type="module">
+      import { createLandscape } from "../dist/index.js";
+
+      const canvas = document.querySelector("#landscape");
+      const status = document.querySelector("#status");
+      const seed = document.querySelector("#seed");
+      const controls = document.querySelector("#controls");
+      const zoom = document.querySelector("#zoom");
+      const download = document.querySelector("#download");
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      let landscape;
+      let frame = 0;
+      let pending = {};
+      let cameraX = 0;
+      let dragging = null;
+      let observer;
+      let contextLost = false;
+
+      function reportError(error) {
+        status.textContent = error instanceof Error ? error.message : String(error);
+      }
+
+      function renderSoon(patch) {
+        Object.assign(pending, patch);
+        if (frame || !landscape) return;
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          try {
+            landscape.render(pending);
+            pending = {};
+            if (!contextLost) status.textContent = `Position ${Math.round(cameraX)} · Seed ${landscape.getOptions().seed}`;
+          } catch (error) { reportError(error); }
+        });
+      }
+
+      function setCamera(value) {
+        cameraX = Math.max(-1e6, Math.min(1e6, value));
+        renderSoon({ cameraX });
+      }
+
+      function resetView() {
+        cameraX = 0;
+        zoom.value = "1";
+        document.querySelector("#zoom-value").value = "1.00×";
+        renderSoon({ cameraX: 0, cameraY: 0, zoom: 1 });
+      }
+
+      try {
+        const bounds = canvas.getBoundingClientRect();
+        landscape = createLandscape(canvas, {
+          seed: seed.value,
+          width: Math.max(1, Math.round(bounds.width)),
+          height: Math.max(1, Math.round(bounds.height)),
+          pixelRatio,
+        });
+        status.textContent = "Ready to explore";
+        observer = new ResizeObserver(entries => {
+          const { width, height } = entries[0].contentRect;
+          if (width > 0 && height > 0) renderSoon({ width: Math.round(width), height: Math.round(height), pixelRatio });
+        });
+        observer.observe(canvas);
+      } catch (error) {
+        reportError(error);
+        controls.querySelectorAll("button, input").forEach(control => { control.disabled = true; });
+      }
+
+      controls.addEventListener("submit", event => {
+        event.preventDefault();
+        renderSoon({ seed: seed.value });
+      });
+
+      for (const name of ["layers", "mist", "vegetation", "zoom"]) {
+        const input = document.querySelector(`#${name}`);
+        const output = document.querySelector(`#${name}-value`);
+        input.addEventListener("input", () => {
+          const value = Number(input.value);
+          output.value = name === "layers" ? String(value) : name === "zoom" ? `${value.toFixed(2)}×` : `${Math.round(value * 100)}%`;
+          renderSoon({ [name]: value });
+        });
+      }
+
+      document.querySelector("#randomize").addEventListener("click", () => {
+        seed.value = `ink-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
+        renderSoon({ seed: seed.value });
+      });
+      document.querySelector("#reset").addEventListener("click", resetView);
+
+      canvas.addEventListener("pointerdown", event => {
+        if (!landscape || event.button !== 0 || !event.isPrimary) return;
+        canvas.focus({ preventScroll: true });
+        dragging = { pointerId: event.pointerId, startX: event.clientX, cameraX };
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add("dragging");
+      });
+      canvas.addEventListener("pointermove", event => {
+        if (!dragging || dragging.pointerId !== event.pointerId) return;
+        const worldUnitsPerPixel = 1000 / (Number(zoom.value) * canvas.getBoundingClientRect().height);
+        setCamera(dragging.cameraX - (event.clientX - dragging.startX) * worldUnitsPerPixel);
+      });
+      const stopDragging = () => { dragging = null; canvas.classList.remove("dragging"); };
+      canvas.addEventListener("pointerup", stopDragging);
+      canvas.addEventListener("pointercancel", stopDragging);
+      canvas.addEventListener("lostpointercapture", stopDragging);
+      canvas.addEventListener("keydown", event => {
+        if (!["ArrowLeft", "ArrowRight", "Home"].includes(event.key)) return;
+        event.preventDefault();
+        if (event.key === "Home") resetView();
+        else setCamera(cameraX + (event.key === "ArrowLeft" ? -1 : 1) * (event.shiftKey ? 250 : 80) / Number(zoom.value));
+      });
+
+      canvas.addEventListener("webglcontextlost", () => {
+        contextLost = true;
+        status.textContent = "Graphics context interrupted. Waiting to restore…";
+        download.disabled = true;
+      });
+      canvas.addEventListener("webglcontextrestored", () => {
+        contextLost = false;
+        download.disabled = false;
+        renderSoon({});
+      });
+
+      download.addEventListener("click", () => {
+        if (!landscape || contextLost) return;
+        try {
+          // Read the current drawing buffer in the same task as the draw.
+          // The library does not preserve or read pixels during normal rendering.
+          if (frame) cancelAnimationFrame(frame);
+          frame = 0;
+          landscape.render(pending);
+          pending = {};
+          download.disabled = true;
+          canvas.toBlob(blob => {
+            download.disabled = contextLost;
+            if (!blob) { reportError(new Error("The browser could not export this image.")); return; }
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.download = `shan-shui-${String(landscape.getOptions().seed).replace(/[^a-z0-9_-]/gi, "-").slice(0, 60) || "landscape"}.png`;
+            link.href = url;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            status.textContent = "PNG saved";
+          }, "image/png");
+        } catch (error) {
+          download.disabled = false;
+          reportError(error);
+        }
+      });
+
+      window.addEventListener("pagehide", event => {
+        if (event.persisted) return;
+        if (frame) cancelAnimationFrame(frame);
+        observer?.disconnect();
+        landscape?.dispose();
+      });
+    </script>
+  </body>
+</html>
