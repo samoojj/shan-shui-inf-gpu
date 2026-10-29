@@ -1,10 +1,7 @@
 # Original tree algorithms and a faithful GPU port
 
-This is an analysis of [the original CPU implementation](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html)
-at commit `9f754d2b2e73495db7883d4d4055a7b0903b0454`, Git blob
-`f0d1da751455f99b46756fcbdde8b02420f27d31`. Citations point to that exact upstream
-file. The original names are `tree01` through `tree08`; the visual labels here
-describe construction, not botanical species.
+Source: [the pinned upstream implementation](upstream.md). The original names
+are `tree01` through `tree08`; labels here describe construction, not botanical species.
 
 ## What the module actually produces
 
@@ -33,18 +30,9 @@ branch  ── random choices; Noise; two boundary-point arrays (no drawing)
 twig    ── twig at two interior samples; blob at tip; stroke
 barkify ── blob or bark ── loopNoise; stroke
         └─ randomly fragmented boundary ── div; Noise; randGaussian; stroke
-blob    ── Noise; loopNoise; poly (or returns 21 boundary points)
-stroke  ── Noise; ribbon-polygon construction; poly
-poly    ── SVG polyline; coordinates rounded to one decimal
 ```
 
-`poly` serializes coordinates with `toFixed(1)`; its filled polyline implicitly
-closes for filling, whereas the stroke follows the actual point list. `stroke`
-builds a variable-width ribbon from the centerline, rather than drawing a uniform
-line. `blob` samples a shaped boundary at 21 points and normalizes a loop of
-noise before scaling that boundary. These dependencies must be preserved across
-the tree implementations. See [poly, L485–509][poly], [stroke,
-L516–575][stroke], and [blob, L578–624][blob].
+Shared brush definitions are in [primitives](original-primitives.md).
 
 ## The eight constructions
 
@@ -135,10 +123,7 @@ before its random call for an empty point list.
 
 ## Randomness and noise are algorithm inputs
 
-The counts below exclude the one-time lazy initialization of the shared Perlin
-table. Its first `Noise.noise` call consumes **4,096 global random draws**; later
-noise samples do not advance the random stream. See [L101–110][noise]. A port
-must make this initialization order explicit before comparing random streams.
+The counts below exclude [lazy noise-table initialization](original-primitives.md#randomness-and-paper).
 The fixed `tree01`, `tree03`, and `tree07` counts below were independently checked
 by instrumenting the original functions in a Node VM with initialized noise.
 
@@ -153,11 +138,6 @@ by instrumenting the original functions in a Node VM with initialized noise.
 | `tree04–06` | Interleaved branch selection, branch geometry, bark generation, and twig recursion. Geometry generation order differs from final painting order because bark/twig strings are accumulated separately. The outline's random alpha and stroke phase are taken after that generation. |
 | `tree07` | Twenty direct trunk noise samples and seven blobs with six draws each, including the blob phase: 42 random draws before deterministic triangulation, 167 noise samples before one additional noise sample per final triangle. |
 | `tree08` | Trunk lean and branch generation first. Every perimeter sample consumes its sprout test. Recursive branches consume a sine-sign choice, a stroke phase, and, for nonterminal nodes, bend sign, split decision, and child parameters in depth-first order. Trunk outline alpha and stroke phase are sampled after the entire branch network is constructed. |
-
-`randGaussian` is the bounded distribution produced by rejection sampling against
-`exp(-24*(x-.5)^2)` on [0,1], remapped to [-1,1]. It is not a standard normal
-sample. `randChoice` consumes a random draw even with a one-element array;
-`normRand` is uniform. See [L417–442][random].
 
 Several easy-to-miss source details affect exact reproduction:
 
@@ -203,60 +183,10 @@ among rocks and architecture in a larger drawing sequence. See
 [L2234–2349][flatdec]. Moving trees onto an unrelated periodic field loses both
 these associations and the foreground/background distribution.
 
-## A GPU strategy that preserves these constructions
+The current [execution boundary](architecture.md#the-cpugpu-seam) retains these
+constructions. [Verification](verification.md) separates exact command/state
+regressions from GPU coordinate and image tolerances.
 
-The useful seam is the original **ordered polygon/brush command stream**, with
-tree construction behind a small species-and-parameters interface. A new generic
-pine/broadleaf distance-field function does not implement these algorithms.
-
-1. **Keep the original tree recipe and its random decisions.** A compute
-   invocation per tree can execute the construction sequentially while separate
-   trees execute in parallel. For recursive methods, use an explicit depth-first
-   stack. Exact original-seed reproduction also requires the scene planner's
-   original global random schedule, including noise-table initialization; giving
-   every object a new hash-derived seed is a documented compatibility change,
-   not an equivalent implementation.
-2. **Generate geometry on the GPU.** Compute produces branch-point arrays,
-   spliced outlines, leaf/blob descriptors, bark runs, and ordered brush commands
-   into storage buffers. CPU work should be settings, dispatch, capacity handling,
-   and submission, not creating the point lists. Preserve `branch`, `twig`, and
-   `barkify` as concrete private modules shared by the relevant species.
-3. **Preserve local painting order independently from construction order.**
-   `tree04–06` need stable fill, outline, bark, and twig ranges even though their
-   random calls interleave while constructing the tree. Use counts/offsets and
-   stable indices, not unordered atomic append order. Retain the scene planner's
-   order between trees, terrain, rocks, and architecture.
-4. **Expand the original primitives.** Blob boundary samples and loop-noise
-   normalization, stroke ribbons, and subdivision are numerical GPU work with
-   natural parallelism once their parameters are known. For complex spliced
-   outlines, retain the source polygon's nonzero fill semantics; a fan from its
-   first vertex is not generally a correct tessellation. An initial faithful
-   renderer can rasterize ordered, tile-binned polygon commands with winding
-   tests, or use a verified GPU tessellator. The choice needs measured workloads.
-   `tree07` additionally needs its original ear ordering and longest-edge
-   subdivision because the resulting triangles are visible shading units.
-5. **Make variable output sizes explicit.** Measure or count command/vertex
-   requirements, allocate ranges, and report overflow for retry. Recursive trees,
-   bark fragments, and rejection sampling must not be silently truncated to a
-   visually convenient budget. WGSL recursion must become bounded-depth stack
-   traversal; bounded depth is not the same as a small fixed number of branches.
-6. **Compare to the original at the primitive seam before landscapes.** For each
-   of the eight methods, freeze the original random/noise state and parameters,
-   capture command count, draw order, coordinates, colors, and final random
-   state, then compare GPU buffer readback. Next render the captured SVG and GPU
-   commands at equal scale and inspect differences. Include bent trees, fractional
-   detail, bare recursion, many foliage marks, and overlapping white trunks. Only
-   then compare complete scenes with the original vegetation placement.
-
-The analysis supports moving these construction and brush-generation algorithms
-to compute plus ordered rendering. It does not establish numerical compatibility,
-rendering quality, or performance for an implementation that has not been written.
-JavaScript double precision versus WGSL float precision, SVG edge antialiasing,
-and polygon coverage need explicit tolerances and side-by-side reference images.
-
-[poly]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L485-L509
-[stroke]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L516-L575
-[blob]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L578-L624
 [tree01]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L744-L801
 [tree02]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L803-L840
 [tree03]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L842-L916
@@ -268,8 +198,6 @@ and polygon coverage need explicit tolerances and side-by-side reference images.
 [tree06]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1374-L1487
 [tree07]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1490-L1579
 [tree08]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1582-L1723
-[noise]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L101-L110
-[random]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L417-L442
 [triangulation]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L307-L379
 [vegetation]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1838-L1985
 [flatdec]: https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2234-L2349

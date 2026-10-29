@@ -127,18 +127,20 @@ export function packDrawing(commands: Drawing): PackedDrawing {
     float(60, command.outline);
     uint(12, outputOffset);
     uint(96, count);
+    const origin = command.kind === 'blob' ? command.center : command.offset;
+    float(64, origin[0]);
+    float(68, origin[1]);
+    if (command.kind !== 'polygon') {
+      float(52, command.noise);
+      float(56, command.seed);
+      if (command.kind !== 'stroke') float(48, command.width);
+    }
     switch (command.kind) {
       case 'polygon':
       case 'stroke': {
         uint(0, command.kind === 'polygon' ? 0 : 1);
         uint(4, inputOffset);
         uint(8, command.points.length);
-        float(64, command.offset[0]);
-        float(68, command.offset[1]);
-        if (command.kind === 'stroke') {
-          float(52, command.noise);
-          float(56, command.seed);
-        }
         for (let i = 0; i < command.points.length; i++) point(inputOffset++, command.points[i], command.kind === 'stroke' ? command.widths[i] : 0);
         break;
       }
@@ -147,11 +149,6 @@ export function packDrawing(commands: Drawing): PackedDrawing {
         uint(4, inputOffset);
         uint(8, 21);
         uint(100, inputOffset);
-        float(48, command.width);
-        float(52, command.noise);
-        float(56, command.seed);
-        float(64, command.center[0]);
-        float(68, command.center[1]);
         float(72, command.length);
         float(76, command.angle);
         for (const sample of command.profile) inputData[inputOffset++ * 4] = sample;
@@ -161,11 +158,6 @@ export function packDrawing(commands: Drawing): PackedDrawing {
         uint(0, 3);
         uint(4, grid.offset);
         uint(8, command.count);
-        float(48, command.width);
-        float(52, command.noise);
-        float(56, command.seed);
-        float(64, command.offset[0]);
-        float(68, command.offset[1]);
         float(80, command.layer);
         float(84, command.start);
         float(88, grid.columns);

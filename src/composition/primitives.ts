@@ -2,24 +2,21 @@
 // Record original construction inputs. WGSL constructs the noisy brush polygons.
 import type { Drawing, Point, ContourStroke } from '../scene/commands.js';
 import { SIGNAGE_GLYPHS, SIGNAGE_KERNING } from './signage.js';
+import type { CompositionContext, RecipeOptions } from './contracts.js';
+import { blobProfile } from './geometry.js';
 
-type Settings = Record<string, any>;
-type Context = {
-  Math: Math;
-  Noise: { noise(x: number, y?: number, z?: number): number; table(): number[] };
-  loopNoise(values: number[]): void;
-};
-const copy = (points: Point[]): Point[] => points.map(p => [p[0], p[1]]);
+type Context = Pick<CompositionContext, 'Math' | 'Noise' | 'loopNoise'>;
+const copy = (points: readonly Readonly<Point>[]): Point[] => points.map(p => [p[0], p[1]]);
 
 export function createPrimitives(context: Context) {
   const { Math, Noise, loopNoise } = context;
-  function poly(points: Point[], args: Settings = {}): Drawing {
+  function poly(points: Point[], args: RecipeOptions = {}): Drawing {
     const fill = args.fil ?? 'rgba(0,0,0,0)';
     return [{ kind: 'polygon', points: copy(points), offset: [args.xof ?? 0, args.yof ?? 0],
       fill, edge: args.str ?? fill, outline: args.wid ?? 0 }];
   }
 
-  function stroke(points: Point[], args: Settings = {}): Drawing {
+  function stroke(points: Point[], args: RecipeOptions = {}): Drawing {
     if (!points.length) return [];
     const width = args.wid ?? 2;
     const profile = args.fun ?? ((t: number) => Math.sin(t * Math.PI));
@@ -32,9 +29,9 @@ export function createPrimitives(context: Context) {
       offset: [args.xof ?? 0, args.yof ?? 0], fill: color, edge: color, outline: args.out ?? 1 }];
   }
 
-  function blob(x: number, y: number, args: Settings = {}): Drawing | Point[] {
+  function blob(x: number, y: number, args: RecipeOptions = {}): Drawing | Point[] {
     const length = args.len ?? 20, width = args.wid ?? 5, angle = args.ang ?? 0, noise = args.noi ?? .5;
-    const fun = args.fun ?? ((p: number) => p <= 1 ? Math.pow(Math.sin(p * Math.PI), .5) : -Math.pow(Math.sin((p + 1) * Math.PI), .5));
+    const fun = args.fun ?? blobProfile;
     const profile = Array.from({ length: 21 }, (_, i) => fun(i / 20 * 2));
     const seed = Math.random() * 10;
     Noise.noise(0);
@@ -55,7 +52,7 @@ export function createPrimitives(context: Context) {
     });
   }
 
-  function texture(points: Point[][], args: Settings = {}): Drawing | Point[][] {
+  function texture(points: Point[][], args: RecipeOptions = {}): Drawing | Point[][] {
     const offset: Point = [args.xof ?? 0, args.yof ?? 0];
     const tex = args.tex ?? 400, width = args.wid ?? 1.5, length = args.len ?? .2, shade = args.sha ?? 0;
     const jitter = args.noi ?? ((layer: number) => 30 / layer);
@@ -107,7 +104,7 @@ export function createPrimitives(context: Context) {
       const anchor = glyph.contours[0][0];
       for (const contour of glyph.contours) {
         if (path.length) path.push([...anchor]);
-        path.push(...contour.map(p => [p[0], p[1]] as Point), [...contour[0]], [...anchor]);
+        path.push(...copy(contour), [...contour[0]], [...anchor]);
       }
       return poly(path.map(p => {
         const px = (p[0] + x - advance / 2) * args.size, py = p[1] * args.size;

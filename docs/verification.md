@@ -1,14 +1,27 @@
 # Verification against the original
 
-The source is LingDong-/shan-shui-inf at commit
-`9f754d2b2e73495db7883d4d4055a7b0903b0454`; see [upstream provenance](upstream.md).
-After establishing parity, the vendored source and source-execution harnesses
-were removed. Acceptance tests now consume the independently captured data
-fixtures, without downloading or installing the original implementation.
+The [upstream provenance](upstream.md) identifies the source revision. Acceptance
+tests consume [independently captured data](../tests/fixtures/README.md).
 
-This port was built from the source studies of [terrain and planning](original-landscape.md),
-[trees](original-trees.md), [motifs](original-motifs.md), and [brush primitives](original-primitives.md).
-The prior approximation shader is not the reference and has been removed.
+## Running the checks
+
+After `npm ci`, run from the repository root:
+
+| Command | Purpose |
+| --- | --- |
+| `npm test` | Strict build and Node acceptance/regression tests |
+| `npm run check:shaders` | Native validation of the three WGSL entry modules |
+| `npm run test:gpu` | Native GPU noise, brush-coordinate, bounds and raster probes |
+| `npm run test:browser` | Chromium/WebGPU lifecycle, rendering, capture and demo scenarios |
+| `npm run compare:reference` | Full-size comparison against the accepted original PNG |
+| `npm pack --dry-run` | Inspect the distributable files and licenses |
+
+Install Chromium with `npx playwright install chromium`, or set
+`CHROMIUM_EXECUTABLE` to an existing executable. Set `SWIFTSHADER=1` for the
+software browser adapter. The native checks require an available WebGPU device;
+they fail rather than skip if none is available. Diagnose it with
+`npm exec --no -- vgpu doctor`. `VGPU_CACHE_DIR` and `MESA_SHADER_CACHE_DIR` can
+point to writable directories. Build-time shader preparation is not device validation.
 
 ## What the comparisons establish
 
@@ -19,14 +32,22 @@ chunk ordering, paints, direct polygons, brush controls, paper random draws,
 repeated views and extensions in both directions. The production library does
 not evaluate the reference HTML, modify global randomness, or upload SVG images.
 
+Separate motif regressions compare 70 cases against the accepted port before
+deduplication: all tree species, building styles, both figure/attachment facings,
+boats, towers and terrain across two seeds. Ordered command hashes and final
+random states stay exact. These guard refactoring and are explicitly distinct
+from the independent upstream acceptance fixtures. Tests never rewrite either baseline.
+
 `npm run test:gpu` uses actual GPU storage buffers and render targets. Its 260
 noise samples differ from the original by at most `7.65e-8`. Eighteen primitive
 cases contain 448 generated points; the measured maximum coordinate difference
 is `0.000147` drawing units. The permitted tolerance is `0.11`, allowing one
 original decimal rounding step plus float32 error. Raster probes check ordered
 alpha blending, white masks, nonzero self-overlap, degenerate paths, open strokes,
-butt caps, repeated vertices and miter joins. All three shader entry points also
-pass native device validation with `npm run check:shaders`.
+butt caps, repeated vertices and miter joins. Byte-valued raster probes allow one
+level of blend/quantization variation. Artifacts are written to
+`test-results/gpu-primitives/report.json` and `raster.png`, including adapter identity.
+All three shader entry points also pass native device validation.
 
 For seed `1234`, the recorded drawing contains 56,513 commands and 1,129,104 final
 path points. GPU compute expands 1,048,087 of those points (92.8%); the remaining
@@ -35,12 +56,6 @@ boundary, not a speedup measurement. CPU work still includes planning, recursive
 motif construction, curve sampling and tree07's geometry-dependent triangulation.
 
 ## Whole-image comparison
-
-Compare a fresh GPU render against the accepted original seed `1234` image:
-
-```sh
-CHROMIUM_EXECUTABLE=/usr/bin/chromium SWIFTSHADER=1 npm run compare:reference
-```
 
 The initial parity study captured three seeds (`1234`, `shan-shui`,
 `quiet-morning`) and 23 individual motifs in isolated iframes. Repeated originals
@@ -55,11 +70,9 @@ Paired PNGs, a standalone comparison page and error metrics are written to
 or more than 3% of pixels differ by over 16/255 in any channel. Actual measured
 errors are reported rather than replaced by pass/fail labels.
 
-GPU float32 arithmetic and this renderer's 4×4 edge coverage are different from
-JavaScript doubles and Chromium's SVG antialiasing. The small original “Pizza Hut”
-plaque uses Liberation Sans outlines in place of browser-dependent Verdana.
-Exact pixel identity is not claimed. The seed and view must match before an
-image difference can be interpreted as raster error.
+The seed and view must match before an image difference can be interpreted as
+raster error. [Documented visual differences](../README.md#fidelity-determinism-and-execution)
+include float precision, antialiasing and plaque-font substitution.
 
 | Seed | Mean absolute channel error / 255 | RMS channel error / 255 | Pixels differing by >16 / 255 |
 | --- | ---: | ---: | ---: |
@@ -77,9 +90,7 @@ GPU output at the same seed and view:
 
 ![GPU port, seed 1234](images/gpu-1234.png)
 
-Mean absolute channel error: **0.716 / 255**. Root mean square channel error:
-**2.038 / 255**. Pixels with any channel difference above 16: **0.254%**.
-Both images were inspected at native resolution.
+Both images were inspected at native resolution; measured errors appear in the table above.
 
 The fractional-pixel-ratio regression checks exact repetition after 512 logical
 pixels. A paper-only before/after comparison also confirms identical decoded
@@ -103,7 +114,7 @@ separate; reduced-resolution lifecycle tests are not presented as visual-quality
 proof. Tests instrument native WebGPU calls to verify that expanded vertices and
 bounds receive no CPU uploads, and cached camera redraws upload only uniforms.
 
-The strict build, all 17 Node tests, native shader/primitive checks and an isolated
+The strict build, all 20 Node tests, native shader/primitive checks and an isolated
 installed-tarball consumer pass. The consumer checks public TypeScript declarations
 without WebGPU ambient types, SSR import, capability probing, unchanged host
 randomness, runtime-bundle identity and packaged licenses/documentation.
@@ -118,16 +129,6 @@ took 161–243 seconds under concurrent test load, including CPU composition,
 compilation and GPU completion. These timings are diagnostic, not a benchmark. Hardware GPU performance remains
 unmeasured.
 
-Repeated unchanged views reuse the painted ink target; camera changes reuse
-expanded geometry when the cached command list is unchanged. New regions and
-seeds require CPU composition and GPU expansion. Session history affects newly
-created chunks just as it does in the original. The API bounds visible width,
-backing pixel count and individual GPU storage buffers; retained world chunks
-still consume memory as exploration grows.
-
-The [original chunk culling](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3973-L3983) checks each
-chunk's anchor against the requested range plus a 512-unit margin. It does not
-test the full geometry's extent: a long distant mountain can disappear abruptly
-when the camera reaches `anchorX + 512`, even while part of it would remain in
-view. The port retains this upstream behavior; such a transition is distinct
-from a rasterization or seed mismatch.
+The [API guide](../README.md#fidelity-determinism-and-execution) owns session-history,
+memory and anchor-culling limitations. The overlap scenarios deliberately select
+views with stable upstream object selection, so they do not claim to fix that culling.

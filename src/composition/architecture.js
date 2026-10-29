@@ -1,25 +1,8 @@
-/*
- * MIT License
- *
- * Copyright (c) 2018 Lingdong Huang
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+import { translate } from './geometry.js';
+
+/**
+ * Original construction by Lingdong Huang. Copyright (c) 2018.
+ * SPDX-License-Identifier: MIT — see the repository LICENSE.
  *
  * Ported from https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html, lines 2525–3322.
  * Original geometry, random-call order, and painter order are preserved.
@@ -36,6 +19,12 @@ export function createArchitecture(env) {
     randChoice, normRand, wtrand, text,
   } = env;
   var Arch = new function() {
+    function outlinePaths(paths, x, y, width) {
+      return paths.flatMap(points => stroke(translate(points, x, y), {
+        col: "rgba(100,100,100,0.4)", noi: 1, wid: width, fun: () => 1,
+      }));
+    }
+
     var flip = function(ptlist, axis) {
       axis = axis == undefined ? 0 : axis;
       for (var i = 0; i < ptlist.length; i++) {
@@ -181,21 +170,7 @@ export function createArchitecture(env) {
         }));
       }
 
-      for (var i = 0; i < ptlist.length; i++) {
-        canv.push(...stroke(
-          ptlist[i].map(function(x) {
-            return [x[0] + xoff, x[1] + yoff];
-          }),
-          {
-            col: "rgba(100,100,100,0.4)",
-            noi: 1,
-            wid: wei,
-            fun: function(x) {
-              return 1;
-            },
-          },
-        ));
-      }
+      canv.push(...outlinePaths(ptlist, xoff, yoff, wei));
       return canv;
     };
 
@@ -334,9 +309,7 @@ export function createArchitecture(env) {
 
       for (var i = 0; i < ptlist.length; i++) {
         canv.push(...stroke(
-          ptlist[i].map(function(x) {
-            return [x[0] + xoff, x[1] + yoff];
-          }),
+          translate(ptlist[i], xoff, yoff),
           {
             col: "rgba(100,100,100,0.5)",
             noi: 0.5,
@@ -423,21 +396,7 @@ export function createArchitecture(env) {
       ]);
       canv.push(...poly(polist, { xof: xoff, yof: yoff, str: "none", fil: "white" }));
 
-      for (var i = 0; i < ptlist.length; i++) {
-        canv.push(...stroke(
-          ptlist[i].map(function(x) {
-            return [x[0] + xoff, x[1] + yoff];
-          }),
-          {
-            col: "rgba(100,100,100,0.4)",
-            noi: 1,
-            wid: wei,
-            fun: function(x) {
-              return 1;
-            },
-          },
-        ));
-      }
+      canv.push(...outlinePaths(ptlist, xoff, yoff, wei));
 
       if (pla[0] == 1) {
         var pp = opf([
@@ -487,21 +446,7 @@ export function createArchitecture(env) {
       }
 
       canv.push(...poly(polist, { xof: xoff, yof: yoff, str: "none", fil: "white" }));
-      for (var i = 0; i < ptlist.length; i++) {
-        canv.push(...stroke(
-          div(ptlist[i], 5).map(function(x) {
-            return [x[0] + xoff, x[1] + yoff];
-          }),
-          {
-            col: "rgba(100,100,100,0.4)",
-            noi: 1,
-            wid: wei,
-            fun: function(x) {
-              return 1;
-            },
-          },
-        ));
-      }
+      canv.push(...outlinePaths(ptlist.map(points => div(points, 5)), xoff, yoff, wei));
 
       return canv;
     };
@@ -565,153 +510,52 @@ export function createArchitecture(env) {
       return canv;
     };
 
-    this.arch02 = function(xoff, yoff, seed, args) {
-      var args = args != undefined ? args : {};
-      var hei = args.hei != undefined ? args.hei : 10;
-      var wid = args.wid != undefined ? args.wid : 50;
-      var rot = args.rot != undefined ? args.rot : 0.3;
-      var per = args.per != undefined ? args.per : 5;
-      var sto = args.sto != undefined ? args.sto : 3;
-      var sty = args.sty != undefined ? args.sty : 1;
-      var rai = args.rai != undefined ? args.rai : false;
-
-      seed = seed != undefined ? seed : 0;
-      var canv = [];
-
-      var hoff = 0;
-      for (var i = 0; i < sto; i++) {
+    // Houses, pagodas and open towers share one bottom-to-top painting order.
+    function stories(xoff, yoff, args = {}, kind) {
+      args = args ?? {};
+      const house = kind === "house", tower = kind === "tower";
+      const hei = args.hei ?? (tower ? 15 : 10);
+      const wid = args.wid ?? (tower ? 30 : 50);
+      const rot = args.rot ?? (house ? 0.3 : 0.7);
+      const per = args.per ?? 5;
+      const sto = args.sto ?? (house ? 3 : tower ? 2 : 7);
+      const sty = args.sty ?? 1;
+      const perspective = house ? per : per / 2;
+      const decorate = tower ? () => [] : a => deco(house ? sty : 1, {
+        ...a,
+        hsp: house ? [[], [1, 5], [1, 5], [1, 4]][sty] : [1, 4],
+        vsp: house ? [[], [1, 2], [1, 2], [1, 3]][sty] : [1, 2],
+      });
+      const roofRecipe = house ? roof : pagroof;
+      const canv = [];
+      let hoff = 0;
+      for (let i = 0; i < sto; i++) {
+        const storyWidth = wid * Math.pow(0.85, i);
         canv.push(...box(xoff, yoff - hoff, {
-          tra: false,
-          hei: hei,
-          wid: wid * Math.pow(0.85, i),
-          rot: rot,
-          wei: 1.5,
-          per: per,
-          dec: function(a) {
-            return deco(
-              sty,
-              Object.assign({}, a, {
-                hsp: [[], [1, 5], [1, 5], [1, 4]][sty],
-                vsp: [[], [1, 2], [1, 2], [1, 3]][sty],
-              }),
-            );
-          },
+          tra: tower, hei, wid: storyWidth, rot, wei: 1.5,
+          per: perspective, dec: decorate,
         }));
-        canv.push(...(rai
-          ? rail(xoff, yoff - hoff, i * 0.2, {
-              wid: wid * Math.pow(0.85, i) * 1.1,
-              hei: hei / 2,
-              per: per,
-              rot: rot,
-              wei: 0.5,
-              tra: false,
-            })
-          : []));
-        var pla = undefined;
-        if (sto == 1 && Math.random() < 1 / 3) {
-          pla = [1, "Pizza Hut"];
+        if (!house || args.rai) {
+          canv.push(...rail(xoff, yoff - hoff, i * 0.2, {
+            seg: house ? undefined : tower ? 3 : 5,
+            wid: storyWidth * (tower ? 1.2 : 1.1), hei: hei / (tower ? 3 : 2),
+            per: perspective, rot, wei: 0.5, tra: tower,
+          }));
         }
-        canv.push(...roof(xoff, yoff - hoff - hei, {
-          hei: hei,
-          wid: wid * Math.pow(0.9, i),
-          rot: rot,
-          wei: 1.5,
-          per: per,
-          pla: pla,
+        // Keep this draw after the railing: the plaque changes the random stream.
+        const pla = house && sto == 1 && Math.random() < 1 / 3 ? [1, "Pizza Hut"] : undefined;
+        canv.push(...roofRecipe(xoff, yoff - hoff - hei, {
+          hei: hei * (kind === "pagoda" ? 1.5 : 1),
+          wid: wid * Math.pow(0.9, i), rot, wei: 1.5, per, pla,
         }));
-
-        hoff += hei * 1.5;
+        hoff += hei * (tower ? 1.2 : 1.5);
       }
       return canv;
-    };
-    this.arch03 = function(xoff, yoff, seed, args) {
-      var args = args != undefined ? args : {};
-      var hei = args.hei != undefined ? args.hei : 10;
-      var wid = args.wid != undefined ? args.wid : 50;
-      var rot = args.rot != undefined ? args.rot : 0.7;
-      var per = args.per != undefined ? args.per : 5;
-      var sto = args.sto != undefined ? args.sto : 7;
+    }
 
-      seed = seed != undefined ? seed : 0;
-      var canv = [];
-
-      var hoff = 0;
-      for (var i = 0; i < sto; i++) {
-        canv.push(...box(xoff, yoff - hoff, {
-          tra: false,
-          hei: hei,
-          wid: wid * Math.pow(0.85, i),
-          rot: rot,
-          wei: 1.5,
-          per: per / 2,
-          dec: function(a) {
-            return deco(1, Object.assign({}, a, { hsp: [1, 4], vsp: [1, 2] }));
-          },
-        }));
-        canv.push(...rail(xoff, yoff - hoff, i * 0.2, {
-          seg: 5,
-          wid: wid * Math.pow(0.85, i) * 1.1,
-          hei: hei / 2,
-          per: per / 2,
-          rot: rot,
-          wei: 0.5,
-          tra: false,
-        }));
-        canv.push(...pagroof(xoff, yoff - hoff - hei, {
-          hei: hei * 1.5,
-          wid: wid * Math.pow(0.9, i),
-          rot: rot,
-          wei: 1.5,
-          per: per,
-        }));
-        hoff += hei * 1.5;
-      }
-      return canv;
-    };
-    this.arch04 = function(xoff, yoff, seed, args) {
-      var args = args != undefined ? args : {};
-      var hei = args.hei != undefined ? args.hei : 15;
-      var wid = args.wid != undefined ? args.wid : 30;
-      var rot = args.rot != undefined ? args.rot : 0.7;
-      var per = args.per != undefined ? args.per : 5;
-      var sto = args.sto != undefined ? args.sto : 2;
-
-      seed = seed != undefined ? seed : 0;
-      var canv = [];
-
-      var hoff = 0;
-      for (var i = 0; i < sto; i++) {
-        canv.push(...box(xoff, yoff - hoff, {
-          tra: true,
-          hei: hei,
-          wid: wid * Math.pow(0.85, i),
-          rot: rot,
-          wei: 1.5,
-          per: per / 2,
-          dec: function(a) {
-            return [];
-          },
-        }));
-        canv.push(...rail(xoff, yoff - hoff, i * 0.2, {
-          seg: 3,
-          wid: wid * Math.pow(0.85, i) * 1.2,
-          hei: hei / 3,
-          per: per / 2,
-          rot: rot,
-          wei: 0.5,
-          tra: true,
-        }));
-        canv.push(...pagroof(xoff, yoff - hoff - hei, {
-          hei: hei * 1,
-          wid: wid * Math.pow(0.9, i),
-          rot: rot,
-          wei: 1.5,
-          per: per,
-        }));
-        hoff += hei * 1.2;
-      }
-      return canv;
-    };
+    this.arch02 = (x, y, seed, args) => stories(x, y, args, "house");
+    this.arch03 = (x, y, seed, args) => stories(x, y, args, "pagoda");
+    this.arch04 = (x, y, seed, args) => stories(x, y, args, "tower");
 
     this.boat01 = function(xoff, yoff, seed, args) {
       var args = args != undefined ? args : {};

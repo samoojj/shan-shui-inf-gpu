@@ -19,12 +19,8 @@ export const lifecycleScenarios = [
         t.require(t.states.map(state => state.status).join(',') === 'ready,error', 'Native failure published false readiness');
         t.require(/usage/i.test(t.states.at(-1).error), 'Native failure did not preserve its explanation');
         t.require(t.gpu.destroyedDevices.has(t.gpu.devices[0]), 'Failed renderer retained its native device');
-        let rejected = false;
-        try { t.renderer.render({ seed: 'must-not-apply' }); } catch { rejected = true; }
-        t.require(rejected, 'An errored renderer accepted rendering');
-        rejected = false;
-        try { await t.renderer.capture(); } catch { rejected = true; }
-        t.require(rejected, 'An errored renderer accepted capture');
+        await t.rejects(() => t.renderer.render({ seed: 'must-not-apply' }), 'An errored renderer accepted rendering');
+        await t.rejects(() => t.renderer.capture(), 'An errored renderer accepted capture');
         t.require(JSON.stringify(t.renderer.getOptions()) === before, 'A rejected render changed the failed scene');
       });
     },
@@ -45,12 +41,8 @@ export const lifecycleScenarios = [
         const t = window.test, before = JSON.stringify(t.renderer.getOptions());
         t.require(t.states.map(state => state.status).join(',') === 'ready,device-lost', 'Device loss published false readiness');
         t.require(t.states.at(-1).error, 'Device loss did not describe its cause');
-        let rejected = false;
-        try { t.renderer.render({ seed: 'must-not-apply' }); } catch { rejected = true; }
-        t.require(rejected, 'A lost device accepted rendering');
-        rejected = false;
-        try { await t.renderer.capture(); } catch { rejected = true; }
-        t.require(rejected, 'A lost device accepted capture');
+        await t.rejects(() => t.renderer.render({ seed: 'must-not-apply' }), 'A lost device accepted rendering');
+        await t.rejects(() => t.renderer.capture(), 'A lost device accepted capture');
         t.require(JSON.stringify(t.renderer.getOptions()) === before, 'A rejected render changed the lost scene');
         t.renderer.dispose();
         t.renderer = await t.api.createLandscape(t.canvas, { width: 320, height: 256, pixelRatio: 0.25, cameraY: 160, seed: 'browser-validation' });
@@ -88,15 +80,11 @@ export const lifecycleScenarios = [
       t.renderer.dispose(); t.renderer.dispose();
       t.require(t.gpu.destroyedDevices.has(device), 'Dispose retained its native device');
       t.require(notifications.join(',') === 'ready', 'Unsubscribe retained a listener');
-      let rejected = false;
-      try { t.renderer.render(); } catch { rejected = true; }
-      t.require(rejected, 'Disposed renderer accepted rendering');
+      await t.rejects(() => t.renderer.render(), 'Disposed renderer accepted rendering');
       const old = t.renderer;
       for (let i = 0; i < 3; i++) {
         const instance = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25, seed: 'remount' });
-        let duplicate = false;
-        try { await t.api.createLandscape(t.canvas); } catch { duplicate = true; }
-        t.require(duplicate, 'Two renderers claimed one canvas');
+        await t.rejects(() => t.api.createLandscape(t.canvas), 'Two renderers claimed one canvas');
         instance.dispose();
       }
       t.require(t.gpu.devices.every(owned => t.gpu.destroyedDevices.has(owned)), 'A mounted renderer leaked its native device');

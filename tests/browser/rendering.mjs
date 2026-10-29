@@ -6,11 +6,8 @@ export const renderingScenarios = [
     async run({ page }) {
       const info = await page.evaluate(() => {
         const t = window.test;
-        let min = 255, max = 0;
-        for (let i = 0; i < t.initial.length; i += 4) {
-          min = Math.min(min, t.initial[i]); max = Math.max(max, t.initial[i]);
-          t.require(t.initial[i + 3] === 255, 'Output must be opaque');
-        }
+        const { min, max } = t.pixelRange(t.initial);
+        for (let i = 3; i < t.initial.length; i += 4) t.require(t.initial[i] === 255, 'Output must be opaque');
         return { min, max, status: t.renderer.getStatus(), renderer: t.gpu.adapterInfo[0] };
       });
       assert.equal(info.status, 'ready');
@@ -113,9 +110,7 @@ export const renderingScenarios = [
       t.require(t.canvas.width === 160 && t.canvas.height === 120, 'Wrong backing dimensions');
       const before = t.renderer.getOptions(), image = t.hash(await t.pixels());
       t.require(before.seed === 'resize-seed' && before.cameraX === -200 && before.zoom === 1.5, 'Resize reset scene options');
-      let rejected = false;
-      try { t.renderer.render({ seed: 'should-not-apply', zoom: 0 }); } catch { rejected = true; }
-      t.require(rejected, 'Invalid render did not throw');
+      await t.rejects(() => t.renderer.render({ seed: 'should-not-apply', zoom: 0 }), 'Invalid render did not throw');
       t.require(JSON.stringify(before) === JSON.stringify(t.renderer.getOptions()), 'Invalid render partially changed options');
       t.renderer.render();
       t.require(t.hash(await t.pixels()) === image, 'Invalid render changed the image');

@@ -1,12 +1,9 @@
 # Accepted upstream outputs
 
-These are data fixtures, not a second implementation. They were captured from
-LingDong-/shan-shui-inf commit `9f754d2b2e73495db7883d4d4055a7b0903b0454`, whose
-`index.html` Git blob is `f0d1da751455f99b46756fcbdde8b02420f27d31`. The source hash
-was checked before capture. The independent VM/observation harnesses used for
-capture are preserved in this repository's history at
-`903f8516df3c94980773014f1479717d7296ebc5`; they are no longer test dependencies.
-All expected values came from upstream execution, not the GPU port.
+[upstream.json](upstream.json) records the verified source and capture-harness
+revisions for the three acceptance fixtures below. They contain independent
+upstream outputs, not a second implementation. The source hash was checked
+before capture; the old VM/observation harness is preserved in git history.
 
 - `context.json`: original PRNG sequence hashes, lazy Perlin samples, noise-table
   hash, helper results, and final random states. The test specifies the calls and
@@ -23,12 +20,18 @@ All expected values came from upstream execution, not the GPU port.
   base64-encoded little-endian bytes. The expected noise values remain the
   original double-precision outputs; GPU tolerances are unchanged.
 
-`docs/images/original-1234.png` is the accepted 1200×700 original image used by
-`npm run compare:reference`. The other historical full-image parity results are
-recorded in `docs/verification.md`.
+`motifs.json` is separate regression evidence: ordered command hashes and final
+random states captured from the accepted port before deduplication. It covers
+all eight trees, building variants/decoration styles, figures and attachments in
+both facings, boats, a transmission tower, and terrain across two seeds. It
+protects rare recipe paths not reached by the upstream whole-scene fixtures;
+it does not claim independent upstream parity.
+
+Image baselines and historical comparison results are documented in the
+[verification report](../../docs/verification.md).
 
 Tests run offline after dependency installation and never regenerate expected
-values from production code. An intentional change to these baselines needs an
+values from production code. An intentional change to the upstream acceptance baselines needs an
 independent upstream capture from the recorded revision and review of the
 changed results; do not update hashes merely to make a failing test pass.
 These test fixtures are excluded from the npm package.

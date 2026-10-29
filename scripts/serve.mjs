@@ -4,15 +4,16 @@ import { dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
+const mime = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
 const publicPath = /^(?:examples\/[\w./-]+|dist\/[\w./-]+|index\.html)$/;
-export function serve(port = 4173) {
+const testPath = /^tests\/browser\/(?:support|capture-worker)\.mjs$/;
+export function serve(port = 4173, { tests = false } = {}) {
   return createServer(async (req, res) => {
     try {
       let path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname).slice(1);
       if (!path || path.endsWith('/')) path += 'index.html';
       const file = resolve(root, path);
-      if (!publicPath.test(path) || path.split('/').some(part => part.startsWith('.')) || !file.startsWith(root + sep)) {
+      if (!(publicPath.test(path) || (tests && testPath.test(path))) || path.split('/').some(part => part.startsWith('.')) || !file.startsWith(root + sep)) {
         res.writeHead(404).end('Not found');
         return;
       }

@@ -20,15 +20,7 @@ export async function runScenario(browser, baseURL, scenario) {
         for (const byte of bytes) value = Math.imul(value ^ byte, 16777619);
         return value >>> 0;
       };
-      const decodePNG = async blob => {
-        const bitmap = await createImageBitmap(blob);
-        try {
-          const decoded = new OffscreenCanvas(bitmap.width, bitmap.height);
-          const context = decoded.getContext('2d');
-          context.drawImage(bitmap, 0, 0);
-          return { width: bitmap.width, height: bitmap.height, pixels: context.getImageData(0, 0, bitmap.width, bitmap.height).data };
-        } finally { bitmap.close(); }
-      };
+      const support = await import('/tests/browser/support.mjs');
       const restores = [];
       const gpu = { devices: [], adapterInfo: [], errors: [], counters: {}, writes: [], draws: [], dispatches: [], buffers: [], afterCreate: null, initialDraws: [], destroyedDevices: new Set(), destroyedBuffers: new Set(), restore() { for (const restore of restores.reverse()) restore(); } };
       const wrap = (prototype, name, replacement) => {
@@ -70,8 +62,8 @@ export async function runScenario(browser, baseURL, scenario) {
         wrap(GPUDevice.prototype, 'destroy', original => function (...args) { gpu.destroyedDevices.add(this); return original.apply(this, args); });
         wrap(GPUBuffer.prototype, 'destroy', original => function (...args) { gpu.destroyedBuffers.add(this); return original.apply(this, args); });
       }
-      const test = window.test = { api, canvas, require, hash, decodePNG, renderer: null, initial: null, gpu };
-      test.pixels = async () => (await decodePNG((await test.renderer.capture()).blob)).pixels;
+      const test = window.test = { api, canvas, require, hash, ...support, renderer: null, initial: null, gpu };
+      test.pixels = async () => (await test.decodePNG((await test.renderer.capture()).blob)).pixels;
       if (createRenderer) {
         // Keep the original logical view while limiting software-rendered pixels.
         // Full-size fidelity comparisons are separate from these API scenarios.

@@ -19,7 +19,6 @@ Use Node.js 22 or newer:
 
 ```sh
 npm install
-npm run build
 npm run demo
 ```
 
@@ -188,13 +187,9 @@ There is no SVG export.
 
 ## Fidelity, determinism, and execution
 
-The port follows the official upstream commit
-[`9f754d2b2e73495db7883d4d4055a7b0903b0454`](https://github.com/LingDong-/shan-shui-inf/tree/9f754d2b2e73495db7883d4d4055a7b0903b0454),
-with HTML Git blob `f0d1da751455f99b46756fcbdde8b02420f27d31`, verified against
-the original upstream checkout. The port preserves its mutable PRNG's JavaScript double
-arithmetic, lazy Perlin table initialization, random consumption, motif
-construction, and painter ordering. Random state is private to each scene;
-the library does not replace the application's `Math.random`.
+The [upstream provenance](docs/upstream.md) identifies the original revision.
+The [architecture](docs/architecture.md#the-cpugpu-seam) defines the hybrid
+execution boundary. Random state is private to each scene.
 
 Fresh sessions with the same seed and sequence of view requests reproduce the
 same composition. The original planner extends a cached world in requested
@@ -210,15 +205,6 @@ not by their full shape. A long distant mountain can therefore disappear
 abruptly while panning when the camera reaches its anchor plus 512 units, even
 if part of the mountain would still be visible. This upstream behavior is retained.
 
-The CPU builds control paths and performs branch decisions, rejection sampling,
-curve sampling, and geometry-dependent topology. In particular, `tree07` asks
-`blob({ ret: 1 })` for points and recursively triangulates them on the CPU; that
-case cannot defer its points until after the grammar has run. Ordinary drawn
-blobs, stroke contours, and texture jitter are generated on the GPU from their
-commands. The rasterizer preserves ordered nonzero fills, outlines, white
-occlusion masks, and alpha compositing, then multiplies the result by the
-original mirrored 512 × 512 paper pattern.
-
 GPU `f32` calculations and raster antialiasing differ from JavaScript doubles
 and browser SVG rasterization. Exact pixel identity is not assumed. The original
 “Pizza Hut” label is retained using bundled Liberation Sans vector outlines in
@@ -233,53 +219,12 @@ resolution. Start with pixel ratio 1 and redraw only when needed. No hardware
 speedup or frame-rate guarantee has been established. Software WebGPU results
 validate tested behavior, not hardware performance.
 
-The source audits explain the original method with line citations:
+## Development and verification
 
-- [Landscape planning and terrain](docs/original-landscape.md)
-- [Drawing primitives and randomness](docs/original-primitives.md)
-- [All eight tree constructions](docs/original-trees.md)
-- [Buildings, figures, boats, and water](docs/original-motifs.md)
-- [Current module ownership and execution](docs/architecture.md)
-
-## Verification
-
-See [the verification report](docs/verification.md) for acceptance fixtures, GPU
-coordinate checks, image-comparison procedure and measured limitations.
-
-```sh
-npm test
-npm run check:shaders
-npm run test:gpu
-npx playwright install chromium
-npm run test:browser
-npm run compare:reference
-npm pack --dry-run
-```
-
-Acceptance tests use numeric outputs and hashes captured independently from the
-verified upstream revision. The original application is no longer vendored,
-executed by tests, or installed as a dependency. Source citations point to
-[the pinned upstream revision](docs/upstream.md).
-
-`npm run compare:reference` compares a fresh GPU render of seed `1234` against
-the accepted original PNG, with no source download or preparatory capture step.
-It writes paired images, per-channel errors and adapter identity.
-`npm run test:gpu` checks noise, expanded coordinates and fill/stroke semantics;
-see [GPU tests](https://github.com/samoojj/shan-shui-inf-gpu/blob/codex/gpu-landscape-library/tests/gpu/README.md)
-and [fixture provenance](https://github.com/samoojj/shan-shui-inf-gpu/blob/codex/gpu-landscape-library/tests/fixtures/README.md).
-
-Use an installed Chromium and software WebGPU when needed:
-
-```sh
-CHROMIUM_EXECUTABLE=/usr/bin/chromium SWIFTSHADER=1 npm run test:browser
-```
-
-Shader validation requires a WebGPU device. Diagnose availability with
-`npm exec --no -- vgpu doctor`; the installed vgpu documentation describes its
-software renderer. Build preparation alone is not device validation. For shader
-changes, edit the native `.wgsl` files, rebuild, validate, and inspect rendered
-results. The accepted data fixtures remain separate from generated test results;
-running verification never overwrites a baseline.
+[Source studies](docs/upstream.md) document terrain, primitives, trees and motifs.
+[Architecture](docs/architecture.md) describes ownership and change boundaries.
+The [verification report](docs/verification.md) is the single guide to running
+checks, understanding their coverage and reviewing measured differences.
 
 ## Attribution and license
 

@@ -8,6 +8,8 @@
 // Original planner/cache: source lines 3706–3827, 3845–3984.
 // Excludes the unused dummy loader and commented-out red/green debug circles.
 // The old string-level NaN replacement belongs to command packing, not planning.
+export const INITIAL_VIEW = Object.freeze({ width: 3000, height: 800 });
+
 export function createWorld(env) {
   const { Math, Noise, Mount, Arch, water, randChoice } = env;
   const plannedRanges = [];
@@ -129,8 +131,8 @@ export function createWorld(env) {
     cwid: 512,
     cursx: 0,
     lasttick: 0,
-    windx: 3000,
-    windy: 800,
+    windx: INITIAL_VIEW.width,
+    windy: INITIAL_VIEW.height,
     planmtx: [],
   };
 
@@ -233,11 +235,6 @@ export function createWorld(env) {
             }),
           });
         }
-        // add ({
-        //   x: plan[i].x,
-        //   y: plan[i].y,
-        //   canv:"<circle cx='"+plan[i].x+"' cy='"+plan[i].y+"' r='20' stroke='black' fill='red' />"
-        // })
       }
     }
   }

@@ -12,16 +12,6 @@ function gridDigest(grid) {
   return gridHashes.get(grid);
 }
 
-test('acceptance data records the verified upstream and capture harness revisions', async () => {
-  for (const name of ['context', 'scenes', 'gpu']) {
-    const { upstream } = await readFixture(name);
-    assert.equal(upstream.repository, 'https://github.com/LingDong-/shan-shui-inf');
-    assert.equal(upstream.commit, '9f754d2b2e73495db7883d4d4055a7b0903b0454');
-    assert.equal(upstream.gitBlob, 'f0d1da751455f99b46756fcbdde8b02420f27d31');
-    assert.equal(upstream.captureHarnessCommit, '903f8516df3c94980773014f1479717d7296ebc5');
-  }
-});
-
 function signature(command, glyph) {
   const { kind, fill, edge, outline } = command;
   const result = { kind, fill, edge, outline };

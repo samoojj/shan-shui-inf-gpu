@@ -1,8 +1,8 @@
 # How the original landscape is constructed
 
-This is a source study of [the original CPU implementation](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html)
-at upstream commit `9f754d2b2e73495db7883d4d4055a7b0903b0454`. Source links cite
-that exact upstream file; the reference application is no longer vendored.
+Source: [the pinned upstream implementation](upstream.md). This study owns
+terrain construction and world planning; shared drawing mathematics live in
+[primitives](original-primitives.md).
 
 ## Construction, not a height-field shader
 
@@ -28,53 +28,8 @@ global seeded random stream + shared noise table
 
 The source uses screen coordinates: increasing `x` goes right and increasing
 `y` goes **down**. Most local mountain/plant heights therefore subtract from an
-object's `y` anchor. `poly` rounds output coordinates to one decimal place and
-emits a styled SVG polyline; SVG closes the fill implicitly even when the
-stroke path is open. This quantization is part of the reference image, although
-the preceding construction uses JavaScript numbers.
-([485–509](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L485-L509))
-
-## Randomness and the noise field
-
-`Math.random` is replaced globally with `Prng.next`. Its state recurrence is
-`s = (s * s) % (999979 * 999983)`, returning `s / m`. Seeding hashes the
-base64-encoded JSON seed, avoids specified degenerate states, and advances ten
-times. Both the hash and recurrence execute in JavaScript double precision;
-the squared state is larger than the exact-integer range. A different integer
-PRNG or ordinary GPU `f32` recurrence is not seed-compatible merely because it
-has the same initial seed. ([1–59](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1-L59))
-
-`Noise.noise` is the p5-style table noise implementation: 4096 table entries,
-cosine interpolation, four octaves, initial amplitude `0.5`, and amplitude
-falloff `0.5`. Negative input coordinates are reflected to positive values.
-The table is initialized **lazily** by consuming 4096 values from the same global
-random stream on the first noise call. An alternative `noiseSeed` LCG exists,
-but the landscape initialization calls `Math.seed`, not `Noise.noiseSeed`.
-([78–202](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L78-L202))
-
-Random consumption is a dependency of the drawing:
-
-- Generation order matters. Constructing one object's vegetation consumes
-  values that affect every following object.
-- Random calls in short-circuited predicates happen only when earlier conditions
-  succeed. For example, the summit-building test draws only at row 1, column 25.
-- Several loops use `j < Math.random() * N` or `j < randChoice(...)` directly in
-  the loop condition. They draw a **new bound on every condition evaluation**,
-  including the terminating evaluation; they are not equivalent to drawing a
-  count once. This occurs throughout `flatDec` and in gap-island planning.
-- Rejection sampling in `wtrand`/`randGaussian` consumes a variable number of
-  random values. `normRand`, despite its name, is uniform interpolation, not a
-  Gaussian sample. ([417–442](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L417-L442))
-- The initial `update()` occurs at line 4310 before the paper-generation loop at
-  4342. Paper then consumes `257 * 257 = 66049` additional random values before
-  later user-driven chunk generation. Running only the construction functions
-  omits this application-level advancement.
-
-A faithful construction port and an exact old-seed replay are separate claims.
-The former preserves formulas, sampling, distributions, motifs, and painting
-order. The latter additionally requires the original random/noise state and
-the same sequence of calls. Any replacement for that sequence must be an
-explicit, tested compatibility decision.
+object's `y` anchor. Shared coordinate quantization, randomness, and noise
+are described in [primitives](original-primitives.md).
 
 ## Regular mountains
 
@@ -133,31 +88,11 @@ All foot polygons receive white fills first, followed by width-1 gray strokes
 with independently selected alpha in `[.1,.2)`.
 ([1728–1801](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1728-L1801))
 
-### Texture is sampled geometry
+### Texture
 
-For texture candidate `t` out of `T`, choose a center column from the outer
-thirds of the row, a half-length `floor(R * columnCount * .2)`, and clip the
-column interval. The default distribution uses two draws: one selects a side,
-one chooses a position within that third. For a 50-column mountain the
-half-length is 0–9, so a candidate has at most 18 centerline points.
-([653–695](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L653-L695))
-
-The row coordinate is `layer = (t/T) * (rowCount - 1)`. For each selected column,
-the exact source interpolation is:
-
-```text
-p = fract(layer)
-point = lowerRowPoint * p + upperRowPoint * (1 - p)
-jitterX = (30 / (layer + 1)) * (Noise(point.x, column * .5) - .5)
-jitterY = (30 / (layer + 1)) * (Noise(point.y, column * .5) - .5)
-```
-
-Here `lowerRowPoint` means row `floor(layer)` and `upperRowPoint` means
-`ceil(layer)`. The coefficients are opposite to conventional interpolation;
-silently swapping them changes the reference construction. The resulting
-short polylines follow the mountain's sampled ridges and are noisier near the
-outer rows. They are not regularly spaced screen-space contour bands.
-([697–717](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L697-L717))
+The mountain uses the [shared texture algorithm](original-primitives.md#the-source-primitives)
+on its 50-column grid. At default interval length, each candidate contains at
+most 18 centerline points and follows the sampled ridges.
 
 Mountain shading selects `sha` from `[0,0,0,0,5]`. With `sha=0`, every candidate
 is stroked at default width `1.5` with random gray alpha in `[0,.3)`. With
@@ -167,14 +102,6 @@ requests either 200 fine strokes, or 100 broad plus 33 fine strokes, before
 empty-path handling. ([668–683](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L668-L683),
 [719–740](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L719-L740),
 [1891–1897](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1891-L1897))
-
-`stroke` expands a polyline into a filled ribbon. Interior width is
-`wid * sin(pi * i / pointCount)`, multiplied by
-`(1-noi) + noi * Noise(i*.5, randomPhase)`. Its two edges use the bisector of
-neighboring segment angles; the two edge lists and endpoints form a closed
-polygon. The polygon also gets the requested SVG outline (default width 1).
-It consumes one random phase for each nonempty input path.
-([516–575](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L516-L575))
 
 ### Vegetation and motif placement
 
@@ -264,16 +191,7 @@ with alpha `.3.. .6`. Default shade width is 10; callers frequently override
 it to 2 or 5. ([2433–2521](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L2433-L2521),
 [404–414](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L404-L414))
 
-## Water strokes
-
-Water is generated beside each regular mountain, not as a continuous filled
-river. Ten candidate centerlines have random horizontal shift in `[-len/16,
-len/16)`, cumulative vertical increments `5R`, and half-length
-`len/4 + R*len/4`. Points are sampled every 5 units along each line with height
-`sin(x*.2)*hei*Noise(x*.1)-20+verticalOffset`. The first candidate is generated
-but not drawn; candidates 1 through 9 become width-1 tapered strokes with gray
-alpha `.3.. .6`. Defaults are `len=800`, `hei=2`. The supplied `seed` is unused.
-([3667–3703](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3667-L3703))
+Water ripple geometry is documented with [boats and figures](original-motifs.md#water-independent-ripple-paths-with-cumulative-spacing).
 
 ## World planner and chunk order
 
@@ -338,12 +256,7 @@ Objects remain cached indefinitely in the source implementation.
 ([3846–3868](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3846-L3868),
 [3973–3983](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3973-L3983))
 
-The final SVG is multiplied over a repeated 512-by-512 paper image. Paper uses
-`c=245+10*Noise(i*.1,j*.1)-20R`, RGB `(c,.95c,.85c)`, rounded to integer channel
-values, mirrored into four quadrants. White polygon fills remain paper-colored
-after multiplication, while still occluding earlier ink within the SVG.
-([4023–4037](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L4023-L4037),
-[4336–4360](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L4336-L4360))
+The selected paths are composited using the [shared paper procedure](original-primitives.md#randomness-and-paper).
 
 ## Cost and dependencies
 
@@ -364,60 +277,5 @@ tessellation, string creation, DOM rebuilding, and rasterization. Moving only
 the final raster image or already-generated CPU triangles to the GPU would not
 move the procedural construction.
 
-## What can move to the GPU without changing the construction
-
-The following is a dependency analysis, not an implemented GPU design:
-
-- **Independent geometry evaluations:** once object parameters, row offsets,
-  noise table, and random choices are fixed, mountain-grid points, rock-ring
-  samples, distant-ridge samples, water-centerline samples, and most motif points
-  can be evaluated in parallel. Preserve the original formulas and sample counts.
-- **Ridge texture:** after a grid exists, candidates can generate their own
-  centerlines in parallel using the original row interpolation and jitter.
-  Prefix sums or fixed bounded slots can give variable outputs disjoint storage.
-- **Stroke expansion:** each interior point reads its two neighbors and expands
-  independently once its stroke's random phase and width function are known.
-  The GPU must rasterize the resulting tapered filled polygon, including any
-  intended outline, rather than replacing it with an arbitrary SDF line.
-- **Growth and proof:** grid growth predicates are parallel. Candidate collection
-  needs stable row-major compaction; neighborhood proof can run in parallel over
-  the collected list. Preserve motif output order after compaction.
-- **Reductions and scans:** row-offset accumulation, `loopNoise` extrema and
-  normalization, variable-geometry allocation, and stable ordering are GPU scan,
-  reduction, or sorting problems. They are not reasons to substitute new noise.
-- **Planner:** field evaluation/local maxima can be parallel, but `chadd`
-  acceptance is order-dependent and occupancy affects the later island pass.
-  Parallel acceptance must reproduce the sequential decisions, or disclose a
-  change. Original random draw positions also depend on these decisions.
-- **Distant tessellation:** independent polygon blocks and accepted triangles
-  can be processed in parallel; recursive longest-edge splitting needs a bounded
-  work queue or staged subdivision. Do not replace its facets with a smooth wash.
-- **Drawing:** preserve an explicit painter sequence for opaque fills and
-  translucent ribbons/blobs. Batching may change submission mechanics but must
-  not reorder overlapping translucent primitives. Draw identifiers, not geometry
-  calculations on the CPU, can coordinate that sequence.
-
-The serial PRNG is the major obstacle to old-seed replay, rather than the
-mountain formula. A GPU port must state whether a serial planning/random-choice
-stage remains on the CPU, is executed on the GPU, or is replaced with a different
-documented sequence. A small CPU control/descriptor stage is distinguishable
-from CPU generation of every landscape point, but that division must be measured
-and described accurately. No speedup follows from this document alone.
-
-## Why the previous shader looked different
-
-The rejected renderer generated bounded, independently hashed mountain cells,
-painted continuous noise fields and analytic contour marks per pixel, and placed
-a small motif catalog over them. That changed the construction at every important
-step: world planning, nested ridge sampling, side-biased short strokes, white
-occlusion, theme-based foreground decoration, distant triangle facets, and the
-global sequence of random choices.
-
-Increasing contrast, adding more noise, or translating those same formulas from
-GLSL to WGSL cannot recover the original painting. The GPU port must first
-reproduce the original ordered primitives and their construction. Validation
-should compare, in sequence, fixed-parameter grid points, texture centerlines,
-expanded stroke polygons, object-level drawings, placement records, and complete
-landscapes against this CPU reference. Raster differences from floating-point
-precision or antialiasing must be separated from changed geometry and missing
-motifs.
+For the implemented processor split and ownership, see [architecture](architecture.md).
+For comparison procedures and measured differences, see [verification](verification.md).

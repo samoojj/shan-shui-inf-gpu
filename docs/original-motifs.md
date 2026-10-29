@@ -1,36 +1,10 @@
 # Original architecture, figures, boats, and water
 
-This document describes [the original CPU implementation](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html),
-principally lines 2525–3704. These observations came from reading that revision;
-GPU execution suggestions below describe the source-study stage. See
-[the current architecture](architecture.md) for the implemented port.
+Source: [the pinned upstream implementation](upstream.md), principally lines
+2525–3704. See [architecture](architecture.md) for the implemented port.
 
-## Shared drawing contract
-
-These motifs construct ordered geometry. They return SVG strings assembled by
-concatenation; they do not evaluate a continuous landscape color field. Their
-common primitives are:
-
-| Primitive | Original operation | Consequence for a port |
-| --- | --- | --- |
-| `div(points, reso)` | Samples each input line segment at `reso` subdivisions and appends the final endpoint. The result has `(points.length - 1) * reso + 1` points for positive integer `reso`. | Retain the piecewise linear path and sample positions. Replacing this with a smooth curve changes roofs and railings. [Source: 627–650](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L627-L650) |
-| `bezmh(points, weight)` | Samples rational quadratic segments, using midpoint joins and 20 subdivisions per segment. A two-point input first receives an inserted midpoint. | This is the actual smoothing used for clothing; retain its weighting and endpoint rules. [Source: 445–482](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L445-L482) |
-| `poly(points, options)` | Emits an SVG **polyline**, with fill and stroke independently specified. Each final translated coordinate is serialized to one decimal place. Default stroke color equals fill color, and default stroke width is zero. | Filled paths and native stroked paths need separate treatment; do not assume every path is a closed stroked polygon. Preserve coordinate quantization for reference comparisons. [Source: 485–509](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L485-L509) |
-| `stroke(points, options)` | Expands interior samples on both sides of the centerline using a bisected tangent angle, a width profile, and Perlin noise. Joins the two sides and original endpoints into a filled polygon, then gives that polygon an additional outline, default width 1. | A GPU line primitive of constant width is insufficient. Both the generated ribbon and its SVG outline contribute to the mark. [Source: 516–575](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L516-L575) |
-| `texture(grid, options)` | Chooses short intervals on interpolated grid rows, displaces their samples with noise, and emits strokes in its defined shade/texture order. | The thatched roof consists of explicit short marks. It is not an image texture or a generic grain overlay. [Source: 653–740](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L653-L740) |
-
-The default stroke width profile is `sin(pi * t)`, so endpoints narrow. Buildings
-often override it with a constant 1; boats override it with `sin(2 * pi * t)`,
-which changes sign halfway along the outline. Default stroke noise is 0.5 and
-each nonempty stroke consumes a fresh random noise offset. Preserve the original
-angle calculation, endpoint handling, and sign rather than substituting a usual
-constant-width polyline join. [Source: 520–573](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L520-L573)
-
-Opaque white fills are part of the design. They cover previously painted marks;
-they are not simply absent ink. Gray strokes with partial alpha accumulate above
-those masks. Keeping only contours or applying an overall paper/noise shader
-would omit the local occlusion that gives huts, pagodas, clothes, and boats their
-shape.
+These motifs use the [shared brush and randomness contracts](original-primitives.md).
+White fills, open outlines and ordered alpha blending are essential to their overlaps.
 
 ## Architecture: shared constructions
 
@@ -182,53 +156,10 @@ cluster count; `stroke` returns before drawing its random offset for an empty
 input. [Cluster draws: 3676–3687](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3676-L3687),
 [stroke empty handling: 531–537](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L531-L537).
 
-## Ordering across motifs
-
-Local motif order is only one level of the painter's algorithm. `chunkloader.add`
-inserts complete motif strings into `MEM.chunks` in ascending y order.
-`chunkrender` concatenates selected chunks in that order. Buildings within a
-mountain remain embedded in that mountain's string; they are not independently
-depth-sorted with boats or buildings on other mountains.
-[Insertion: 3845–3874](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3845-L3874),
-[rendering: 3973–3983](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3973-L3983).
-
-Equal-y insertion is not a general stable sort: a new chunk tied with the first
-element is prepended, a last-element tie is appended unless the first condition
-already matched, and interior ties enter at the first matching interval. A port
-that sorts `(y, creationIndex)` must first show that it reproduces the relevant
-reference ordering or explicitly document a change.
-[Source: 3852–3866](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3852-L3866)
-
-Water associated with a mountain is drawn at the mountain's coordinates but
-inserted with sort y equal to `mountain.y - 10000`. This puts ripples behind the
-land and its white masks. Boats retain their actual y coordinate and use scale
-`y / 800`; their facing is randomized. The planner considers boat candidates
-every five world units, with probability 0.2, then rejects candidates within
-400 x units of **any** existing entry in that plan. It does not only test
-boat-to-boat spacing.
-[Water insertion: 3888–3902](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3888-L3902),
-[boat construction: 3929–3937](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3929-L3937),
-[candidate spacing: 3722–3731](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3722-L3731),
-[boat planning: 3806–3810](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3806-L3810).
+World insertion, y ordering, water depth keys and boat spacing are covered by
+[the planner study](original-landscape.md#world-planner-and-chunk-order).
 
 ## Randomness, recursion, and topology constraints
-
-The original replaces `Math.random` with one mutable seeded stream. Motif
-`seed` parameters do not isolate their random consumption. On its first use,
-the noise module fills a 4096-value table from that same stream. That initial
-allocation, recursive calls, choices, and unused random draws all affect later
-geometry. Parallel invocations cannot independently advance this shared state
-and retain the original sequence.
-[PRNG: 1–59](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L1-L59),
-[initial noise table: 90–109](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L90-L109).
-
-The PRNG uses JavaScript Number multiplication and remainder with an approximately
-`10^12` modulus. A direct WGSL `f32` or `u32` replacement does not reproduce it.
-Even reproducing exact integer modular arithmetic would not automatically match
-the JavaScript rounding of the original large products. Reference fidelity
-therefore requires an explicit numeric and random-stream strategy, not merely
-using the same displayed seed.
-[Source: 3–6 and 34–36](https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html#L3-L36)
 
 Within this motif group, recursion appears in two distinct forms:
 
@@ -249,46 +180,5 @@ therefore known only after some choices, and SVG text adds a different primitive
 type. A faithful GPU buffer layout must account for those counts rather than
 silently truncating motifs to a convenient fixed budget.
 
-## GPU work that preserves the construction
-
-The useful seam is between ordered motif decisions and evaluated drawing
-primitives. Moving the following geometry work to compute or vertex shaders
-keeps the original procedural approach. Supplying only an already rasterized
-CPU image or CPU-expanded final vertices would not move this generation work.
-
-| Work | Parallel units | Preconditions and order that must remain |
-| --- | --- | --- |
-| Hut and roof samples | One invocation per profile/sample or edge/subdivision | Height choices, roof parameters, and path counts already assigned. Keep sampled paths, silhouette omissions, and texture mark distribution. |
-| Windows and story geometry | One invocation per selected story/path/sample | Story dimensions can be computed from index; preserve the outer story paint order even if positions are evaluated simultaneously. |
-| Railing geometry | Independent rail samples where writes do not overlap; posts after required perturbations | First resolve opening/truncation. For wrapped indices, reproduce ordered repeated mutations; blindly writing each post in parallel creates races and different final rail points. |
-| Figure joint positions | One invocation per joint or figure | Use the fixed ancestor paths and original summation order. Joint 4's y must be available before final grounding; a small second stage or repeated computation supplies it. |
-| Cloth, hats, stick | One invocation per curve/shape sample, followed by one per expanded contour sample | Contour expansion reads neighboring centerline samples. Use separate stages or evaluate those neighbors explicitly. Item, clothing, hair, and hat paint order stays unchanged. |
-| Water geometry | One invocation per selected cluster/sample | Preassign `xk`, `lk`, and random y increments; obtain cumulative `yk` by an ordered prefix computation. A parallel reassociation can change rounding, so quantify that separately. Keep cluster 0's state contribution and omit its drawing. |
-| Stroke expansion | One invocation per non-endpoint sample | Read neighboring centerline points; retain per-path random offset, original noise table, width profile, bisector calculation, endpoint closure, coordinate quantization, and outline. |
-| Rasterization | GPU processing of generated filled contours and native polyline strokes | Preserve SVG fill/outline behavior and antialiasing expectations. Submit alpha-composited primitives in their original paint order; white masks and overlaps make arbitrary batching incorrect. |
-
-Variable output can use a count stage and prefix offsets before geometry
-generation, or motif-specific reserved storage with exact emitted counts and
-explicit overflow handling. Either is an execution strategy, not permission to
-alter topology. Nonconvex or self-crossing stroke contours require the original
-fill semantics; a naive triangle fan is not a general replacement for an SVG
-filled polyline. A rendering port also needs a deliberate solution for the
-occasional plaque text.
-
-A practical fidelity path can retain ordered random/topology decisions on the
-CPU while uploading compact motif parameters and random values, then generate
-the dense centerlines, contour vertices, and rendered output on the GPU. This
-would be a hybrid port with substantive GPU generation; it must be described as
-such. Moving that planning stage too requires explicit work queues or passes,
-compatible PRNG arithmetic, ordered rejection sampling, and exact allocation
-rules. An independently hashed seed per motif, generic noise-field buildings,
-or different water equations would be a new generator, not this algorithm
-executed on the GPU.
-
-Before claiming parity, compare isolated motifs at fixed saved random states,
-their ordered primitive lists/counts, and their rendered overlaps. Include both
-facings, all four architecture types, each decoration, zero/one/two people,
-transparent rails with openings, plaque text, multiple boat scales, and default
-water including its omitted first cluster. Then compare composed scenes with
-water behind land and boats interleaved by y. These are proposed verification
-targets; this source audit does not establish image or performance equivalence.
+The [architecture](architecture.md#the-cpugpu-seam) owns the implemented CPU/GPU
+boundary; the [verification report](verification.md) records its tested behavior.

@@ -1,3 +1,5 @@
+import { translate, blobProfile } from './geometry.js';
+
 /**
  * Original tree construction by Lingdong Huang. Copyright (c) 2018.
  * SPDX-License-Identifier: MIT — see the repository LICENSE.
@@ -19,6 +21,37 @@ export function createTrees(env) {
   } = env;
 
   var Tree = new function() {
+    // Fill must precede trimming; bark and twigs paint over the trunk outline.
+    function paintTree(points, x, y, color, bark, twigs, trim = true, opacity = 0.4) {
+      const drawing = poly(points, { xof: x, yof: y, fil: "white", str: color, wid: 0 });
+      if (trim) {
+        points.splice(0, 1);
+        points.splice(points.length - 1, 1);
+      }
+      drawing.push(...stroke(translate(points, x, y), {
+        col: "rgba(100,100,100," + (opacity + Math.random() * 0.1).toFixed(3) + ")",
+        wid: 2.5, fun: () => Math.sin(1), noi: 0.9, out: 0,
+      }));
+      drawing.push(...bark, ...twigs);
+      return drawing;
+    }
+
+    function leafProfile(x) {
+      return x <= 1
+        ? Math.pow(Math.sin(x * Math.PI) * x, 0.5)
+        : -Math.pow(Math.sin((x - 2) * Math.PI * (x - 2)), 0.5);
+    }
+
+    function leafColor(color, opacity = 0.5) {
+      return color.includes("rgba(")
+        ? color.replace("rgba(", "").replace(")", "").split(",")
+        : ["100", "100", "100", String(opacity)];
+    }
+
+    function trunkNoise(resolution) {
+      return Array.from({ length: resolution }, (_, i) => [Noise.noise(i * 0.5), Noise.noise(i * 0.5, 0.5)]);
+    }
+
     this.tree01 = function(x, y, args) {
       var args = args != undefined ? args : {};
       var hei = args.hei != undefined ? args.hei : 50;
@@ -27,20 +60,9 @@ export function createTrees(env) {
       var noi = args.noi != undefined ? args.noi : 0.5;
 
       var reso = 10;
-      var nslist = [];
-      for (var i = 0; i < reso; i++) {
-        nslist.push([Noise.noise(i * 0.5), Noise.noise(i * 0.5, 0.5)]);
-      }
+      var nslist = trunkNoise(reso);
 
-      var leafcol;
-      if (col.includes("rgba(")) {
-        leafcol = col
-          .replace("rgba(", "")
-          .replace(")", "")
-          .split(",");
-      } else {
-        leafcol = ["100", "100", "100", "0.5"];
-      }
+      var leafcol = leafColor(col);
       var canv = [];
       var line1 = [];
       var line2 = [];
@@ -84,15 +106,7 @@ export function createTrees(env) {
       var col = args.col != undefined ? args.col : "rgba(100,100,100,0.5)";
       var noi = args.noi != undefined ? args.noi : 0.5;
 
-      var leafcol;
-      if (col.includes("rgba(")) {
-        leafcol = col
-          .replace("rgba(", "")
-          .replace(")", "")
-          .split(",");
-      } else {
-        leafcol = ["100", "100", "100", "0.5"];
-      }
+      var leafcol = leafColor(col);
 
       var canv = [];
       for (var i = 0; i < clu; i++) {
@@ -101,11 +115,7 @@ export function createTrees(env) {
           y + randGaussian() * clu * 4,
           {
             ang: Math.PI / 2,
-            fun: function(x) {
-              return x <= 1
-                ? Math.pow(Math.sin(x * Math.PI) * x, 0.5)
-                : -Math.pow(Math.sin((x - 2) * Math.PI * (x - 2)), 0.5);
-            },
+            fun: leafProfile,
             wid: Math.random() * wid * 0.75 + wid * 0.5,
             len: Math.random() * hei * 0.75 + hei * 0.5,
             col: col,
@@ -128,20 +138,9 @@ export function createTrees(env) {
       var noi = args.noi != undefined ? args.noi : 0.5;
 
       var reso = 10;
-      var nslist = [];
-      for (var i = 0; i < reso; i++) {
-        nslist.push([Noise.noise(i * 0.5), Noise.noise(i * 0.5, 0.5)]);
-      }
+      var nslist = trunkNoise(reso);
 
-      var leafcol;
-      if (col.includes("rgba(")) {
-        leafcol = col
-          .replace("rgba(", "")
-          .replace(")", "")
-          .split(",");
-      } else {
-        leafcol = ["100", "100", "100", "0.5"];
-      }
+      var leafcol = leafColor(col);
       var canv = [];
       var blobs = [];
       var line1 = [];
@@ -316,11 +315,7 @@ export function createTrees(env) {
                 ang:
                   ang / 2 + Math.PI / 2 + Math.PI * 0.2 * (Math.random() - 0.5),
                 col: "rgba(100,100,100," + (0.5 + dep * 0.2).toFixed(3) + ")",
-                fun: function(x) {
-                  return x <= 1
-                    ? Math.pow(Math.sin(x * Math.PI) * x, 0.5)
-                    : -Math.pow(Math.sin((x - 2) * Math.PI * (x - 2)), 0.5);
-                },
+                fun: leafProfile,
               },
             ));
           }
@@ -340,11 +335,7 @@ export function createTrees(env) {
       function bark(x, y, wid, ang) {
         var len = 10 + 10 * Math.random();
         var noi = 0.5;
-        var fun = function(x) {
-          return x <= 1
-            ? Math.pow(Math.sin(x * Math.PI), 0.5)
-            : -Math.pow(Math.sin((x + 1) * Math.PI), 0.5);
-        };
+        var fun = blobProfile;
         var reso = 20.0;
         var canv = [];
 
@@ -454,9 +445,7 @@ export function createTrees(env) {
             (Noise.noise(i, j * 0.1, 2) - 0.5) * (15 + 5 * randGaussian());
         }
         canv.push(...stroke(
-          rglist[i].map(function(v) {
-            return [v[0] + x, v[1] + y];
-          }),
+          translate(rglist[i], x, y),
           { wid: 1.5, col: "rgba(100,100,100,0.7)", out: 0 },
         ));
       }
@@ -470,7 +459,6 @@ export function createTrees(env) {
       var col = args.col != undefined ? args.col : "rgba(100,100,100,0.5)";
       var noi = args.noi != undefined ? args.noi : 0.5;
 
-      var canv = [];
       var txcanv = [];
       var twcanv = [];
 
@@ -496,10 +484,7 @@ export function createTrees(env) {
 
           brlist[0].splice(0, 1);
           brlist[1].splice(0, 1);
-          var foff = function(v) {
-            return [v[0] + trlist[i][0], v[1] + trlist[i][1]];
-          };
-          txcanv.push(...barkify(x, y, [brlist[0].map(foff), brlist[1].map(foff)]));
+          txcanv.push(...barkify(x, y, brlist.map(points => translate(points, trlist[i][0], trlist[i][1]))));
 
           for (var j = 0; j < brlist[0].length; j++) {
             if (Math.random() < 0.2 || j == brlist[0].length - 1) {
@@ -518,37 +503,13 @@ export function createTrees(env) {
           }
           brlist = brlist[0].concat(brlist[1].reverse());
           trmlist = trmlist.concat(
-            brlist.map(function(v) {
-              return [v[0] + trlist[i][0], v[1] + trlist[i][1]];
-            }),
+            translate(brlist, trlist[i][0], trlist[i][1]),
           );
         } else {
           trmlist.push(trlist[i]);
         }
       }
-      canv.push(...poly(trmlist, { xof: x, yof: y, fil: "white", str: col, wid: 0 }));
-
-      trmlist.splice(0, 1);
-      trmlist.splice(trmlist.length - 1, 1);
-      canv.push(...stroke(
-        trmlist.map(function(v) {
-          return [v[0] + x, v[1] + y];
-        }),
-        {
-          col:
-            "rgba(100,100,100," + (0.4 + Math.random() * 0.1).toFixed(3) + ")",
-          wid: 2.5,
-          fun: function(x) {
-            return Math.sin(1);
-          },
-          noi: 0.9,
-          out: 0,
-        },
-      ));
-
-      canv.push(...txcanv);
-      canv.push(...twcanv);
-      return canv;
+      return paintTree(trmlist, x, y, col, txcanv, twcanv);
     };
 
     this.tree05 = function(x, y, args) {
@@ -558,7 +519,6 @@ export function createTrees(env) {
       var col = args.col != undefined ? args.col : "rgba(100,100,100,0.5)";
       var noi = args.noi != undefined ? args.noi : 0.5;
 
-      var canv = [];
       var txcanv = [];
       var twcanv = [];
 
@@ -589,10 +549,6 @@ export function createTrees(env) {
 
           brlist[0].splice(0, 1);
           brlist[1].splice(0, 1);
-          var foff = function(v) {
-            return [v[0] + trlist[i][0], v[1] + trlist[i][1]];
-          };
-          //txcanv += barkify(x,y,[brlist[0].map(foff),brlist[1].map(foff)])
 
           for (var j = 0; j < brlist[0].length; j++) {
             if (j % 20 == 0 || j == brlist[0].length - 1) {
@@ -612,38 +568,14 @@ export function createTrees(env) {
           }
           brlist = brlist[0].concat(brlist[1].reverse());
           trmlist = trmlist.concat(
-            brlist.map(function(v) {
-              return [v[0] + trlist[i][0], v[1] + trlist[i][1]];
-            }),
+            translate(brlist, trlist[i][0], trlist[i][1]),
           );
         } else {
           trmlist.push(trlist[i]);
         }
       }
 
-      canv.push(...poly(trmlist, { xof: x, yof: y, fil: "white", str: col, wid: 0 }));
-
-      trmlist.splice(0, 1);
-      trmlist.splice(trmlist.length - 1, 1);
-      canv.push(...stroke(
-        trmlist.map(function(v) {
-          return [v[0] + x, v[1] + y];
-        }),
-        {
-          col:
-            "rgba(100,100,100," + (0.4 + Math.random() * 0.1).toFixed(3) + ")",
-          wid: 2.5,
-          fun: function(x) {
-            return Math.sin(1);
-          },
-          noi: 0.9,
-          out: 0,
-        },
-      ));
-
-      canv.push(...txcanv);
-      canv.push(...twcanv);
-      return canv;
+      return paintTree(trmlist, x, y, col, txcanv, twcanv);
     };
 
     this.tree06 = function(x, y, args) {
@@ -653,7 +585,6 @@ export function createTrees(env) {
       var col = args.col != undefined ? args.col : "rgba(100,100,100,0.5)";
       var noi = args.noi != undefined ? args.noi : 0.5;
 
-      var canv = [];
       var txcanv = [];
       var twcanv = [];
 
@@ -719,9 +650,7 @@ export function createTrees(env) {
             }
 
             trmlist = trmlist.concat(
-              brlist.map(function(v) {
-                return [v[0] + trlist[i][0], v[1] + trlist[i][1]];
-              }),
+              translate(brlist, trlist[i][0], trlist[i][1]),
             );
           } else {
             trmlist.push(trlist[i]);
@@ -737,29 +666,7 @@ export function createTrees(env) {
         ben: 0,
       });
 
-      canv.push(...poly(trmlist, { xof: x, yof: y, fil: "white", str: col, wid: 0 }));
-
-      trmlist.splice(0, 1);
-      trmlist.splice(trmlist.length - 1, 1);
-      canv.push(...stroke(
-        trmlist.map(function(v) {
-          return [v[0] + x, v[1] + y];
-        }),
-        {
-          col:
-            "rgba(100,100,100," + (0.4 + Math.random() * 0.1).toFixed(3) + ")",
-          wid: 2.5,
-          fun: function(x) {
-            return Math.sin(1);
-          },
-          noi: 0.9,
-          out: 0,
-        },
-      ));
-
-      canv.push(...txcanv);
-      canv.push(...twcanv);
-      return canv;
+      return paintTree(trmlist, x, y, col, txcanv, twcanv);
     };
 
     this.tree07 = function(x, y, args) {
@@ -776,19 +683,8 @@ export function createTrees(env) {
       var noi = args.noi != undefined ? args.noi : 0.5;
 
       var reso = 10;
-      var nslist = [];
-      for (var i = 0; i < reso; i++) {
-        nslist.push([Noise.noise(i * 0.5), Noise.noise(i * 0.5, 0.5)]);
-      }
-      var leafcol;
-      if (col.includes("rgba(")) {
-        leafcol = col
-          .replace("rgba(", "")
-          .replace(")", "")
-          .split(",");
-      } else {
-        leafcol = ["100", "100", "100", "1"];
-      }
+      var nslist = trunkNoise(reso);
+      var leafcol = leafColor(col, 1);
       var canv = [];
       var line1 = [];
       var line2 = [];
@@ -861,7 +757,6 @@ export function createTrees(env) {
       var col = args.col != undefined ? args.col : "rgba(100,100,100,0.5)";
       var noi = args.noi != undefined ? args.noi : 0.5;
 
-      var canv = [];
       var txcanv = [];
       var twcanv = [];
 
@@ -974,28 +869,7 @@ export function createTrees(env) {
         }
       }
 
-      canv.push(...poly(trlist, { xof: x, yof: y, fil: "white", str: col, wid: 0 }));
-
-      canv.push(...stroke(
-        trlist.map(function(v) {
-          return [v[0] + x, v[1] + y];
-        }),
-        {
-          col:
-            "rgba(100,100,100," + (0.6 + Math.random() * 0.1).toFixed(3) + ")",
-          wid: 2.5,
-          fun: function(x) {
-            return Math.sin(1);
-          },
-          noi: 0.9,
-          out: 0,
-        },
-      ));
-
-      canv.push(...txcanv);
-      canv.push(...twcanv);
-      //console.log(canv)
-      return canv;
+      return paintTree(trlist, x, y, col, txcanv, twcanv, false, 0.6);
     };
   }();
   return Tree;

@@ -1,3 +1,5 @@
+import { translate } from './geometry.js';
+
 /**
  * Faithful command-output port of Lingdong Huang's shan-shui construction.
  * Copyright (c) 2018 Lingdong Huang. MIT; see ../../LICENSE.
@@ -13,6 +15,16 @@
 export function createMountains(env) {
   const { Math, Noise, PolyTools, Tree, Arch, poly, stroke, texture, div, loopNoise, randChoice, normRand } = env;
   var Mount = new function() {
+    function paintRidge(points, layers, x, y) {
+      const drawing = poly(points.concat([[0, layers * 4]]), {
+        xof: x, yof: y, fil: "white", str: "none",
+      });
+      drawing.push(...stroke(translate(points, x, y), {
+        col: "rgba(100,100,100,0.3)", noi: 1, wid: 3,
+      }));
+      return drawing;
+    }
+
     var foot = function(ptlist, args) {
       var args = args != undefined ? args : {};
       var xof = args.xof != undefined ? args.xof : 0;
@@ -74,9 +86,7 @@ export function createMountains(env) {
       }
       for (var j = 0; j < ftlist.length; j++) {
         canv.push(...stroke(
-          ftlist[j].map(function(x) {
-            return [x[0] + xof, x[1] + yof];
-          }),
+          translate(ftlist[j], xof, yof),
           {
             col:
               "rgba(100,100,100," +
@@ -123,7 +133,7 @@ export function createMountains(env) {
         }
       }
 
-      function vegetate(treeFunc, growthRule, proofRule) {
+      function vegetate(treeFunc, growthRule, proofRule = () => true) {
         var veglist = [];
         for (var i = 0; i < ptlist.length; i += 1) {
           for (var j = 0; j < ptlist[i].length; j += 1) {
@@ -155,25 +165,9 @@ export function createMountains(env) {
             i == 0 && ns * ns * ns < 0.1 && Math.abs(ptlist[i][j][1]) / h > 0.2
           );
         },
-        function(veglist, i) {
-          return true;
-        },
       );
 
-      //WHITE BG
-      canv.push(...poly(ptlist[0].concat([[0, reso[0] * 4]]), {
-        xof: xoff,
-        yof: yoff,
-        fil: "white",
-        str: "none",
-      }));
-      //OUTLINE
-      canv.push(...stroke(
-        ptlist[0].map(function(x) {
-          return [x[0] + xoff, x[1] + yoff];
-        }),
-        { col: "rgba(100,100,100,0.3)", noi: 1, wid: 3 },
-      ));
+      canv.push(...paintRidge(ptlist[0], reso[0], xoff, yoff));
 
       canv.push(...foot(ptlist, { xof: xoff, yof: yoff }));
       canv.push(...texture(ptlist, {
@@ -197,9 +191,6 @@ export function createMountains(env) {
         function(i, j) {
           var ns = Noise.noise(i * 0.1, j * 0.1, seed + 2);
           return ns * ns * ns < 0.1 && Math.abs(ptlist[i][j][1]) / h > 0.5;
-        },
-        function(veglist, i) {
-          return true;
         },
       );
 
@@ -269,9 +260,6 @@ export function createMountains(env) {
               (j == 0 || j == ptlist[i].length - 1) && ns * ns * ns * ns < 0.012
             );
           },
-          function(veglist, i) {
-            return true;
-          },
         );
       }
 
@@ -302,9 +290,6 @@ export function createMountains(env) {
             ns * ns * ns * ns < 0.008
           );
         },
-        function(veglist, i) {
-          return true;
-        },
       );
       //TOP ARCH
       vegetate(
@@ -321,9 +306,6 @@ export function createMountains(env) {
             Math.random() < 0.02
           );
         },
-        function(veglist, i) {
-          return true;
-        },
       );
 
       //TRANSM
@@ -339,9 +321,6 @@ export function createMountains(env) {
             ns * ns * ns * ns < 0.002
           );
         },
-        function(veglist, i) {
-          return true;
-        },
       );
 
       //BOTT ROCK
@@ -355,9 +334,6 @@ export function createMountains(env) {
         },
         function(i, j) {
           return (j == 0 || j == ptlist[i].length - 1) && Math.random() < 0.1;
-        },
-        function(veglist, i) {
-          return true;
         },
       );
 
@@ -412,22 +388,8 @@ export function createMountains(env) {
         }
       }
 
-      //WHITE BG
-      canv.push(...poly(ptlist[0].concat([[0, reso[0] * 4]]), {
-        xof: xoff,
-        yof: yoff,
-        fil: "white",
-        str: "none",
-      }));
-      //OUTLINE
-      canv.push(...stroke(
-        ptlist[0].map(function(x) {
-          return [x[0] + xoff, x[1] + yoff];
-        }),
-        { col: "rgba(100,100,100,0.3)", noi: 1, wid: 3 },
-      ));
+      canv.push(...paintRidge(ptlist[0], reso[0], xoff, yoff));
 
-      //canv += foot(ptlist,{xof:xoff,yof:yoff})
       canv.push(...texture(ptlist, {
         xof: xoff,
         yof: yoff,
@@ -476,10 +438,6 @@ export function createMountains(env) {
         var v = (1 - Math.abs((i % d) - d / 2) / (d / 2)) * 0.12;
         grlist[i][0] *= 1 - v + Noise.noise(grlist[i][1] * 0.5) * v;
       }
-      /*       for (var i = 0; i < ptlist.length; i++){
-        canv += poly(ptlist[i],{xof:xoff,yof:yoff,str:"red",fil:"none",wid:2})
-      }
- */
       canv.push(...poly(grlist, {
         xof: xoff,
         yof: yoff,
@@ -487,7 +445,7 @@ export function createMountains(env) {
         fil: "white",
         wid: 2,
       }));
-      canv.push(...stroke(grlist.map(x => [x[0] + xoff, x[1] + yoff]), {
+      canv.push(...stroke(translate(grlist, xoff, yoff), {
         wid: 3,
         col: "rgba(100,100,100,0.2)",
       }));
@@ -778,9 +736,7 @@ export function createMountains(env) {
       }));
       //OUTLINE
       canv.push(...stroke(
-        ptlist[0].map(function(x) {
-          return [x[0] + xoff, x[1] + yoff];
-        }),
+        translate(ptlist[0], xoff, yoff),
         { col: "rgba(100,100,100,0.3)", noi: 1, wid: 3 },
       ));
       canv.push(...texture(ptlist, {

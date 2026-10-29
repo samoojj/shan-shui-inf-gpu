@@ -1,25 +1,6 @@
-/*
- * MIT License
- *
- * Copyright (c) 2018 Lingdong Huang
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+/**
+ * Original construction by Lingdong Huang. Copyright (c) 2018.
+ * SPDX-License-Identifier: MIT — see the repository LICENSE.
  *
  * Ported from https://github.com/LingDong-/shan-shui-inf/blob/9f754d2b2e73495db7883d4d4055a7b0903b0454/index.html, lines 3324–3665.
  * Original geometry, random-call order, and painter order are preserved.
@@ -92,10 +73,8 @@ export function createPeople(env) {
       return [vtxlist0, vtxlist1];
     };
 
-    var tranpoly = function(p0, p1, ptlist) {
-      var plist = ptlist.map(function(v) {
-        return [-v[0], v[1]];
-      });
+    var tranpoly = function(p0, p1, ptlist, flip = false) {
+      var plist = flipper(flip ? flipper(ptlist) : ptlist);
       var ang = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]) - Math.PI / 2;
       var scl = distance(p0, p1);
       var qlist = plist.map(function(v) {
@@ -120,17 +99,11 @@ export function createPeople(env) {
 
       var canv = [];
       var seed = Math.random();
-      var f = fli
-        ? flipper
-        : function(x) {
-            return x;
-          };
-      //var plist = [[-0.5,0.5],[0.5,0.5],[0.5,1],[-0.5,2]]
       canv.push(...poly(
         tranpoly(
           p0,
           p1,
-          f([
+          [
             [-0.3, 0.5],
             [0.3, 0.8],
             [0.2, 1],
@@ -138,7 +111,8 @@ export function createPeople(env) {
             [-0.3, 1.15],
             [-0.55, 1],
             [-0.65, 0.5],
-          ]),
+          ],
+          fli,
         ),
         { fil: "rgba(100,100,100,0.8)" },
       ));
@@ -150,7 +124,7 @@ export function createPeople(env) {
           0.5 - i * 0.3,
         ]);
       }
-      canv.push(...poly(tranpoly(p0, p1, f(qlist1)), {
+      canv.push(...poly(tranpoly(p0, p1, qlist1, fli), {
         str: "rgba(100,100,100,0.8)",
         wid: 1,
       }));
@@ -165,19 +139,11 @@ export function createPeople(env) {
       var canv = [];
       var seed = Math.random();
 
-      var f = fli
-        ? flipper
-        : function(x) {
-            return x;
-          };
-      // canv += poly(tranpoly(p0,p1,[
-      //   [-0.3,0.6],[-0.15,1.0],[0,1.1],[0.15,1.0],[0.3,0.6]
-      //   ]),{fil:"white",str:"rgba(130,130,130,0.8)",wid:1})
       canv.push(...poly(
         tranpoly(
           p0,
           p1,
-          f([
+          [
             [-0.3, 0.5],
             [-1.1, 0.5],
             [-1.2, 0.6],
@@ -188,7 +154,8 @@ export function createPeople(env) {
             [1.3, 0.6],
             [1.2, 0.5],
             [0.3, 0.5],
-          ]),
+          ],
+          fli,
         ),
         { fil: "rgba(100,100,100,0.8)" },
       ));
@@ -201,11 +168,6 @@ export function createPeople(env) {
 
       var canv = [];
       var seed = Math.random();
-      var f = fli
-        ? flipper
-        : function(x) {
-            return x;
-          };
 
       var qlist1 = [];
       var l = 12;
@@ -215,7 +177,7 @@ export function createPeople(env) {
           0 + i * 0.3,
         ]);
       }
-      canv.push(...poly(tranpoly(p0, p1, f(qlist1)), {
+      canv.push(...poly(tranpoly(p0, p1, qlist1, fli), {
         str: "rgba(100,100,100,0.5)",
         wid: 1,
       }));

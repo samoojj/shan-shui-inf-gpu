@@ -14,6 +14,8 @@ src/index.ts                         Public exports and types
        ├─ src/options.ts             Seed/view validation and target sizing
        └─ src/gpu/program.ts         Device, buffers, pipelines, frames, cleanup
             ├─ src/scene/compose.ts  One seeded composition and chunk cache
+            │    ├─ composition/index.ts        Wires recipes to one private context
+            │    ├─ composition/geometry.ts     Shared control-point translations
             │    ├─ composition/context.js      Original arithmetic and utilities
             │    ├─ composition/world.js        Original planner and painter order
             │    ├─ composition/mountains.js    Mountains, foothills, rocks
@@ -35,7 +37,8 @@ src/shaders/noise.wgsl               Original noise sampling from the seeded tab
 scripts/build.mjs                   Type declarations, WGSL preparation, ES bundle
 ```
 
-The scene module assembles the recipe factories around a private context. They
+The composition factory assembles recipes around a private context. The scene
+module owns initial planning, paper sequencing, and view caching. They
 retain original arithmetic and branch order while replacing SVG strings with
 ordered drawing-command arrays. Plain JavaScript preserves the original recipes
 in recognizable form; typed scene/command interfaces contain their interaction
@@ -79,25 +82,20 @@ The source audits are the implementation guide:
 [planning](original-landscape.md), [primitives](original-primitives.md),
 [trees](original-trees.md), and [motifs](original-motifs.md). They cite the exact upstream revision used to establish parity.
 
-## Randomness and comparison invariants
+## Shared construction rules
 
-The seed is `encodeURIComponent(String(seed))`, matching a value passed through
-the original URL interface. `context.js` preserves the PRNG's JavaScript Number
-arithmetic and lazy 4096-entry Perlin allocation. It uses a private Math object;
-importing or rendering cannot replace the host application's `Math.random`.
+`composition/contracts.ts` owns recipe inputs and outputs. `geometry.ts` owns
+control-point translation. Species-specific growth stays in its recipe; common
+painting order belongs to private helpers: `paintTree`, `paintRidge`,
+`outlinePaths` and `stories`. Helpers must preserve random consumption and
+operand order, including apparently unused draws. The mathematical definitions
+remain in the [source studies](upstream.md).
 
-Composition starts with the original initial world request, then consumes paper
-randomness before subsequent exploration. New chunk requests continue that
-stateful stream. Repeating a fresh session with the same seed and request history
-repeats composition; arbitrary exploration orders need not converge to the same
-world. Captured options do not serialize this history or the chunk cache.
-
-Keep unused original random draws, duplicate endpoint handling, numeric defaults,
-and painter ordering unless an intentional deviation is separately documented.
-GPU math uses `f32`; reference math uses JavaScript doubles. Path antialiasing
-also differs from browser SVG. Comparisons must distinguish exact composition
-facts from measured pixel differences. The plaque's bundled Liberation Sans
-outlines are an explicit substitution for the original Verdana request.
+CPU doubles and GPU float32 implementations of noise and geometry are deliberate:
+CPU geometry sometimes determines later topology, while GPU geometry paints
+commands. Their agreement is tested against independent captured data. They
+cannot share an implementation across the execution boundary without changing
+precision or moving work between processors.
 
 ## Native WGSL build
 
@@ -120,40 +118,27 @@ ready ── fatal rendering error ──────────────►
 any active state ── dispose ─────────────────► disposed
 ```
 
-A ready session owns a complete program. Failed construction releases partial
-resources and its canvas lease. Device loss and rendering failure are terminal;
-callers dispose and recreate the session. Render/resize throw and capture rejects
-when unavailable. No native browser event is an alternative source of readiness.
-`subscribe` reports current state immediately and then changes; disposal clears
-subscriptions and prevents late device notifications from reactivating a session.
+`landscape.ts` owns canvas leases, state notifications and terminal transitions.
+`program.ts` owns native resources and releases partial setup on failure. Late
+notifications cannot reactivate disposed sessions. Public failure/recreation and
+subscription semantics are specified in [the API guide](../README.md#lifecycle-and-browser-support).
 
 An unchanged view reuses the painted ink target and only composites it to the
 canvas. Camera or size changes repaint the target; unchanged command lists reuse
 their GPU-expanded points.
 
-`capture(patch?)` validates options, draws, snapshots dimensions and settings,
-starts PNG encoding, and checks submitted GPU work. HTML and OffscreenCanvas
-encoding differences stay private. Once encoding starts, later renders or
-disposal cannot relabel that snapshot. A captured seed/view does not imply a
-portable serialization of the planner's prior exploration history. Filenames,
-downloads, error presentation, and requestAnimationFrame scheduling stay with the
-caller.
+Capture snapshots its settings before handing PNG encoding to the canvas. HTML
+and OffscreenCanvas encoding stay private to the program. Downloads, filenames,
+error presentation and event scheduling belong to the caller; see
+[capture semantics](../README.md#offscreencanvas-and-capture).
 
 ## Verification and change guide
 
-Acceptance fixtures record independent outputs from the pinned upstream revision:
-random/noise samples, scene and command hashes, primitive coordinates, and an
-original image. Tests use these data files without executing or installing the
-original application. Source studies link to upstream; no duplicate reference
-implementation is retained or packaged. Fixture updates require independent
-capture and review, never automatic regeneration from the port.
-
-Recipe comparisons should inspect topology, command order, control geometry,
-and random state. GPU comparisons should use the same source seed, generation
-history, and viewport, then report actual error measurements and any tolerance.
-Interface tests own fresh canvases and cover seeds, panning, resizing, capture,
-cleanup, errors, and device loss. Software-adapter checks establish tested
-behavior; hardware speedup requires separate measurements.
+[Verification](verification.md) owns commands, coverage and measured limitations.
+The browser suite and image comparator share launch/cleanup in
+`tests/helpers/browser.mjs`; page and worker probes share image decoding and
+metrics in `tests/browser/support.mjs`. The fixture directory documents its
+independent acceptance data and separate pre-refactor motif regressions.
 
 - Change public options and lifecycle rules in the session/options modules.
 - Change a motif in its recipe module and compare it with the cited upstream routine.

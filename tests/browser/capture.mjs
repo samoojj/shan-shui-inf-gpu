@@ -19,12 +19,8 @@ export const captureScenarios = [
       t.require(t.renderer.getOptions().seed === 'newer-scene', 'Capture changed the current scene');
       const decoded = await t.decodePNG(frame.blob);
       t.require(decoded.width === frame.width && decoded.height === frame.height, 'PNG dimensions disagree with capture metadata');
-      let difference = 0;
-      for (let y = 0; y < frame.height; y++) for (let x = 0; x < frame.width; x++) for (let c = 0; c < 4; c++) {
-        difference += Math.abs(expected[(y * frame.width + x) * 4 + c]
-          - decoded.pixels[(y * frame.width + x) * 4 + c]);
-      }
-      t.require(difference / expected.length < 0.1, `Captured PNG does not represent the requested scene: mean byte difference ${difference / expected.length}`);
+      const { meanAbsoluteChannelError } = t.comparePixels(expected, decoded.pixels);
+      t.require(meanAbsoluteChannelError < 0.1, `Captured PNG does not represent the requested scene: mean byte difference ${meanAbsoluteChannelError}`);
     }),
   },
   {
@@ -32,9 +28,7 @@ export const captureScenarios = [
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
       const before = JSON.stringify(t.renderer.getOptions());
-      let rejected = false;
-      try { await t.renderer.capture({ seed: 'invalid-patch', zoom: 0 }); } catch { rejected = true; }
-      t.require(rejected, 'Invalid capture options must reject');
+      await t.rejects(() => t.renderer.capture({ seed: 'invalid-patch', zoom: 0 }), 'Invalid capture options must reject');
       t.require(JSON.stringify(t.renderer.getOptions()) === before, 'Invalid capture partially changed settings');
       const pending = t.renderer.capture({ seed: 'before-disposal', cameraY: 160 });
       t.renderer.dispose();
@@ -42,14 +36,9 @@ export const captureScenarios = [
       t.require(t.renderer.getStatus() === 'disposed', 'Capture revived a disposed renderer');
       t.require(frame.options.seed === 'before-disposal', 'Capture lost its settings snapshot');
       const decoded = await t.decodePNG(frame.blob);
-      let min = 255, max = 0;
-      for (let i = 0; i < decoded.pixels.length; i += 4) {
-        min = Math.min(min, decoded.pixels[i]); max = Math.max(max, decoded.pixels[i]);
-      }
+      const { min, max } = t.pixelRange(decoded.pixels);
       t.require(max - min > 30, 'Capture became blank after disposal');
-      rejected = false;
-      try { await t.renderer.capture(); } catch { rejected = true; }
-      t.require(rejected, 'A disposed renderer must reject new captures');
+      await t.rejects(() => t.renderer.capture(), 'A disposed renderer must reject new captures');
     }),
   },
   {
@@ -60,9 +49,7 @@ export const captureScenarios = [
       const original = t.canvas.toBlob;
       try {
         t.canvas.toBlob = callback => callback(null);
-        let rejected = false;
-        try { await t.renderer.capture(); } catch { rejected = true; }
-        t.require(rejected, 'A null encoding result must reject capture');
+        await t.rejects(() => t.renderer.capture(), 'A null encoding result must reject capture');
         t.require(t.renderer.getStatus() === 'ready', 'An encoding failure must not poison the renderer');
       } finally { t.canvas.toBlob = original; }
       const device = t.gpu.devices.at(-1);
@@ -78,9 +65,7 @@ export const captureScenarios = [
       device.destroy();
       await lost;
       const before = JSON.stringify(t.renderer.getOptions());
-      let rejected = false;
-      try { await t.renderer.capture({ seed: 'must-not-apply' }); } catch { rejected = true; }
-      t.require(rejected, 'A lost device must reject capture');
+      await t.rejects(() => t.renderer.capture({ seed: 'must-not-apply' }), 'A lost device must reject capture');
       t.require(JSON.stringify(t.renderer.getOptions()) === before, 'A rejected capture changed the lost scene');
     }),
   },
@@ -134,38 +119,7 @@ export const captureScenarios = [
     name: 'OffscreenCanvas captures a nonblank PNG and immutable scene settings in a module worker',
     run: async ({ page, baseURL }) => {
       const result = await page.evaluate(async origin => {
-        const source = `import { createLandscape } from '${origin}/dist/index.js';
-          self.onmessage = async ({ data }) => {
-            let landscape;
-            try {
-              landscape = await createLandscape(data.canvas, { width: 128, height: 96, pixelRatio: 0.25, cameraY: 240, seed: 'worker-capture' });
-              async function decode(blob) {
-                const bitmap = await createImageBitmap(blob);
-                const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-                const context = canvas.getContext('2d');
-                context.drawImage(bitmap, 0, 0); bitmap.close();
-                return context.getImageData(0, 0, canvas.width, canvas.height).data;
-              }
-              const before = await decode((await landscape.capture()).blob);
-              await new Promise(resolve => setTimeout(resolve, 0));
-              const pending = landscape.capture();
-              landscape.render({ seed: 'worker-next' });
-              const frame = await pending;
-              const pixels = await decode(frame.blob);
-              let difference = 0, min = 255, max = 0;
-              for (let y = 0; y < frame.height; y++) for (let x = 0; x < frame.width; x++) for (let c = 0; c < 4; c++) {
-                difference += Math.abs(before[(y * frame.width + x) * 4 + c] - pixels[(y * frame.width + x) * 4 + c]);
-              }
-              for (let i = 0; i < pixels.length; i += 4) { min = Math.min(min, pixels[i]); max = Math.max(max, pixels[i]); }
-              self.postMessage({ min, max, meanDifference: difference / before.length,
-                type: frame.blob.type, width: frame.width, height: frame.height, seed: frame.options.seed,
-                logicalWidth: frame.options.width, logicalHeight: frame.options.height,
-                currentSeed: landscape.getOptions().seed });
-            } catch (error) { self.postMessage({ failure: error.message }); }
-            finally { landscape?.dispose(); }
-          };`;
-        const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
-        const worker = new Worker(url, { type: 'module' });
+        const worker = new Worker(`${origin}/tests/browser/capture-worker.mjs`, { type: 'module' });
         try {
           return await new Promise((resolve, reject) => {
             const timer = setTimeout(() => reject(new Error('Worker capture timed out')), 120000);
@@ -174,7 +128,7 @@ export const captureScenarios = [
             const canvas = new OffscreenCanvas(128, 96);
             worker.postMessage({ canvas }, [canvas]);
           });
-        } finally { worker.terminate(); URL.revokeObjectURL(url); }
+        } finally { worker.terminate(); }
       }, baseURL);
       assert.equal(result.failure, undefined, result.failure);
       assert.equal(result.type, 'image/png');
