@@ -1,102 +1,118 @@
+function failedInitialization(name, configuration, expectedGPUErrors = []) {
+  return {
+    name, createRenderer: false, expectedGPUErrors,
+    run: ({ page }) => page.evaluate(async configuration => {
+      const t = window.test;
+      t.harness.nextConfiguration = configuration;
+      const error = await t.rejects(() => t.api.createLandscape(t.canvas, {
+        width: 200, height: 160, pixelRatio: 0.25,
+      }), 'Failed worker initialization returned a renderer');
+      const expectedReason = configuration.pipelineFailure ? /pipeline compilation/i : /Deliberate/;
+      t.require(expectedReason.test(error.message), `Initialization lost the reason: ${error.message}`);
+      const failed = t.harness.current;
+      t.require(failed.terminated, 'Failed initialization retained its worker');
+      if (configuration.scriptFailure) {
+        // A worker load error precedes transfer; the original canvas remains usable.
+        t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 });
+      } else {
+        const reused = await t.rejects(() => t.api.createLandscape(t.canvas), 'A transferred canvas was reused');
+        t.require(/fresh canvas/i.test(reused.message), 'Canvas reuse did not explain irreversible transfer');
+        t.require(failed.metrics.devices.every(device => failed.metrics.destroyedDevices.includes(device)), 'Partial setup retained a device');
+        t.renderer = await t.api.createLandscape(t.freshCanvas(), { width: 200, height: 160, pixelRatio: 0.25 });
+      }
+      t.require(t.renderer.getStatus() === 'ready', 'Fresh initialization did not recover');
+    }, configuration),
+  };
+}
+
 export const lifecycleScenarios = [
   {
-    name: 'native validation failure publishes error and releases renderer resources',
-    observeGPU: true,
+    name: 'native validation failure publishes error and releases worker resources',
     expectedGPUErrors: [/usage/i],
     async run({ page }) {
       await page.evaluate(async () => {
         const t = window.test;
         t.states = [];
-        t.renderer.subscribe(state => t.states.push({ status: state.status, error: state.error?.message ?? null }));
-        // A real native validation failure, outside vgpu's own error scopes.
-        const device = t.gpu.devices[0];
-        device.createBuffer({ size: 4, usage: 0 });
-        await device.queue.onSubmittedWorkDone().catch(() => {});
+        t.renderer.subscribe(state => t.states.push({ status: state.status, error: state.error?.message }));
+        await t.command('validation-error');
       });
       await page.waitForFunction(() => window.test.renderer.getStatus() === 'error');
       await page.evaluate(async () => {
         const t = window.test, before = JSON.stringify(t.renderer.getOptions());
         t.require(t.states.map(state => state.status).join(',') === 'ready,error', 'Native failure published false readiness');
-        t.require(/usage/i.test(t.states.at(-1).error), 'Native failure did not preserve its explanation');
-        t.require(t.gpu.destroyedDevices.has(t.gpu.devices[0]), 'Failed renderer retained its native device');
-        await t.rejects(() => t.renderer.render({ seed: 'must-not-apply' }), 'An errored renderer accepted rendering');
-        await t.rejects(() => t.renderer.capture(), 'An errored renderer accepted capture');
-        t.require(JSON.stringify(t.renderer.getOptions()) === before, 'A rejected render changed the failed scene');
+        t.require(/usage/i.test(t.states.at(-1).error), 'Native failure lost its explanation');
+        t.require(t.harness.current.terminated, 'Failed renderer retained its worker');
+        t.require(t.gpu.devices.every(device => t.gpu.destroyedDevices.includes(device)), 'Failed renderer retained its device');
+        await t.rejects(() => t.renderer.render({ seed: 'must-not-apply' }), 'Failed renderer accepted rendering');
+        await t.rejects(() => t.renderer.capture(), 'Failed renderer accepted capture');
+        t.require(JSON.stringify(t.renderer.getOptions()) === before, 'Rejected work changed a failed scene');
       });
     },
   },
   {
-    name: 'native device loss is terminal and explicit recreation reproduces the scene',
-    observeGPU: true,
+    name: 'native device loss is terminal and a fresh canvas reproduces the scene',
     async run({ page }) {
-      await page.evaluate(() => {
+      await page.evaluate(async () => {
         const t = window.test;
         t.states = [];
-        t.renderer.subscribe(state => t.states.push({ status: state.status, error: state.error?.message ?? null }));
-        t.lostDevice = t.gpu.devices[0];
-        t.lostDevice.destroy();
+        t.renderer.subscribe(state => t.states.push(state.status));
+        await t.command('lose-device');
       });
       await page.waitForFunction(() => window.test.renderer.getStatus() === 'device-lost');
       await page.evaluate(async () => {
         const t = window.test, before = JSON.stringify(t.renderer.getOptions());
-        t.require(t.states.map(state => state.status).join(',') === 'ready,device-lost', 'Device loss published false readiness');
-        t.require(t.states.at(-1).error, 'Device loss did not describe its cause');
-        await t.rejects(() => t.renderer.render({ seed: 'must-not-apply' }), 'A lost device accepted rendering');
-        await t.rejects(() => t.renderer.capture(), 'A lost device accepted capture');
-        t.require(JSON.stringify(t.renderer.getOptions()) === before, 'A rejected render changed the lost scene');
+        t.require(t.states.join(',') === 'ready,device-lost', 'Device loss published false readiness');
+        await t.rejects(() => t.renderer.render({ seed: 'must-not-apply' }), 'Lost device accepted rendering');
+        t.require(JSON.stringify(t.renderer.getOptions()) === before, 'Rejected work changed a lost scene');
         t.renderer.dispose();
-        t.renderer = await t.api.createLandscape(t.canvas, { width: 320, height: 256, pixelRatio: 0.25, cameraY: 160, seed: 'browser-validation' });
-        t.require(t.renderer.getStatus() === 'ready', 'Explicit recreation did not restore readiness');
-        t.require(t.gpu.devices.at(-1) !== t.lostDevice, 'Recreation reused the destroyed device');
-        t.require(t.hash(await t.pixels()) === t.hash(t.initial), 'Recreation changed the seeded scene');
+        const reuse = await t.rejects(() => t.api.createLandscape(t.canvas), 'Transferred canvas was reused');
+        t.require(/fresh canvas/i.test(reuse.message), 'Device-loss recovery did not explain canvas replacement');
+        t.renderer = await t.api.createLandscape(t.freshCanvas(), {
+          width: 320, height: 256, pixelRatio: 0.25, cameraY: 160, seed: 'browser-validation',
+        });
+        t.require(t.hash(await t.pixels()) === t.hash(t.initial), 'Fresh recreation changed the seeded scene');
       });
     },
   },
   {
-    name: 'disposal while device loss is pending cannot reactivate resources or subscribers',
-    observeGPU: true,
+    name: 'disposal suppresses a pending device-loss transition',
     run: ({ page }) => page.evaluate(async () => {
-      const t = window.test, device = t.gpu.devices[0];
-      const states = [];
+      const t = window.test, states = [];
       t.renderer.subscribe(state => states.push(state.status));
-      const count = t.gpu.devices.length;
-      device.destroy();
+      const loss = t.command('lose-device').catch(() => {});
       t.renderer.dispose();
-      await device.lost;
-      await new Promise(resolve => setTimeout(resolve, 0));
-      t.require(t.renderer.getStatus() === 'disposed', 'A late device-loss callback reactivated the renderer');
-      t.require(t.gpu.devices.length === count, 'Disposed renderer acquired another device');
-      t.require(states.join(',') === 'ready,disposed', 'Disposed renderer published a late lifecycle transition');
+      await loss;
+      await t.harness.terminated();
+      t.require(t.renderer.getStatus() === 'disposed', 'Late loss revived a disposed renderer');
+      t.require(states.join(',') === 'ready,disposed', 'Disposed renderer emitted a late transition');
     }),
   },
   {
-    name: 'dispose releases the owned device and supports repeated mounting',
-    observeGPU: true,
+    name: 'disposal releases each device and fresh canvases support repeated mounting',
     run: ({ page }) => page.evaluate(async () => {
-      const t = window.test, device = t.gpu.devices[0];
-      const notifications = [];
+      const t = window.test, notifications = [];
       const unsubscribe = t.renderer.subscribe(state => notifications.push(state.status));
       unsubscribe();
       t.renderer.dispose(); t.renderer.dispose();
-      t.require(t.gpu.destroyedDevices.has(device), 'Dispose retained its native device');
-      t.require(notifications.join(',') === 'ready', 'Unsubscribe retained a listener');
+      await t.harness.terminated();
+      t.require(notifications.join(',') === 'ready', 'Unsubscribe retained its listener');
       await t.rejects(() => t.renderer.render(), 'Disposed renderer accepted rendering');
-      const old = t.renderer;
       for (let i = 0; i < 3; i++) {
-        const instance = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25, seed: 'remount' });
+        const instance = await t.api.createLandscape(t.freshCanvas(), { width: 200, height: 160, pixelRatio: 0.25, seed: 'remount' });
         await t.rejects(() => t.api.createLandscape(t.canvas), 'Two renderers claimed one canvas');
         instance.dispose();
+        await t.harness.terminated();
       }
-      t.require(t.gpu.devices.every(owned => t.gpu.destroyedDevices.has(owned)), 'A mounted renderer leaked its native device');
-      t.require(t.gpu.buffers.every(({ buffer, device: owner }) => t.gpu.destroyedBuffers.has(buffer) || t.gpu.destroyedDevices.has(owner)), 'A buffer outlived its renderer');
-      await Promise.all(t.gpu.devices.map(owned => owned.lost));
-      t.require(old.getStatus() === 'disposed', 'Disposed renderer retained lifecycle callbacks');
+      for (const worker of t.harness.workers) {
+        const gpu = worker.metrics;
+        t.require(gpu.devices.every(device => gpu.destroyedDevices.includes(device)), 'Mounted renderer leaked a device');
+        t.require(gpu.buffers.every(({ buffer, device }) => gpu.destroyedBuffers.includes(buffer) || gpu.destroyedDevices.includes(device)), 'Buffer outlived its renderer');
+      }
     }),
   },
   {
-    name: 'concurrent initialization claims the canvas before its first await',
+    name: 'concurrent initialization claims a canvas before its first await',
     createRenderer: false,
-    observeGPU: true,
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
       const outcomes = await Promise.allSettled([
@@ -107,87 +123,61 @@ export const lifecycleScenarios = [
       if (outcomes[1].status === 'fulfilled') outcomes[1].value.dispose();
       t.require(outcomes[0].status === 'fulfilled', `First initialization failed: ${outcomes[0].reason}`);
       t.require(outcomes[1].status === 'rejected', 'Concurrent initialization created two owners');
-      t.require(t.gpu.devices.length === 1, 'Rejected initialization acquired a redundant native device');
+      t.require(t.harness.workers.length === 1, 'Rejected initialization acquired a redundant worker');
     }),
   },
   {
-    name: 'device acquisition failure releases canvas ownership for retry',
+    name: 'unsupported worker WebGPU is detected before transfer and supports retry',
     createRenderer: false,
-    observeGPU: true,
     run: ({ page }) => page.evaluate(async () => {
-      const t = window.test, original = GPUAdapter.prototype.requestDevice;
-      GPUAdapter.prototype.requestDevice = async () => { throw new Error('Deliberate device allocation failure'); };
-      let error;
-      try { await t.api.createLandscape(t.canvas); } catch (cause) { error = cause; }
-      finally { GPUAdapter.prototype.requestDevice = original; }
-      t.require(error instanceof Error, 'Failed acquisition did not reject initialization');
-      t.require(t.gpu.devices.length === 0, 'Failed acquisition retained a device');
+      const t = window.test;
+      t.harness.nextConfiguration = { noAdapter: true };
+      t.require(!(await t.api.isWebGPUSupported()), 'Unavailable worker reported WebGPU support');
+      t.harness.nextConfiguration = { noAdapter: true };
+      await t.rejects(() => t.api.createLandscape(t.canvas), 'Unsupported worker accepted the canvas');
       t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 });
-      t.require(t.renderer.getStatus() === 'ready', 'Failed acquisition retained canvas ownership');
+      t.require(t.renderer.getStatus() === 'ready', 'Support failure consumed the canvas');
     }),
   },
+  failedInitialization('worker startup failure leaves the untransferred canvas reusable', { scriptFailure: true }),
+  failedInitialization('device acquisition failure after transfer requires a fresh canvas', { deviceFailure: true }),
+  failedInitialization('pipeline failure releases resources and requires a fresh canvas', { pipelineFailure: true }),
+  failedInitialization('first-frame failure rejects readiness and releases resources',
+    { firstFrameFailure: 'Deliberate first-frame failure' }, [/Deliberate first-frame failure/]),
   {
-    name: 'asynchronous pipeline failure frees resources and allows initialization retry',
-    createRenderer: false,
-    observeGPU: true,
-    run: ({ page }) => page.evaluate(async () => {
-      const t = window.test, original = GPUDevice.prototype.createRenderPipelineAsync;
-      GPUDevice.prototype.createRenderPipelineAsync = async () => { throw new Error('Deliberate pipeline compilation failure'); };
-      let error;
-      try { await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 }); } catch (cause) { error = cause; }
-      finally { GPUDevice.prototype.createRenderPipelineAsync = original; }
-      t.require(error instanceof Error, 'Pipeline compilation failure did not reject initialization');
-      t.require(t.gpu.devices.length > 0, 'Failure test never acquired a native device');
-      t.require(t.gpu.devices.every(device => t.gpu.destroyedDevices.has(device)), 'Failed initialization leaked its native device');
-      t.require(t.gpu.buffers.every(({ buffer, device }) => t.gpu.destroyedBuffers.has(buffer) || t.gpu.destroyedDevices.has(device)), 'Failed initialization leaked GPU buffers');
-      t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 });
-      t.require(t.renderer.getStatus() === 'ready', 'Pipeline failure retained canvas ownership');
-    }),
-  },
-  {
-    name: 'first-frame native failure rejects initialization and releases ownership for retry',
-    createRenderer: false,
-    observeGPU: true,
-    expectedGPUErrors: [/Deliberate first-frame failure/],
-    run: ({ page }) => page.evaluate(async () => {
-      const t = window.test, submit = GPUQueue.prototype.submit;
-      let submitted = false, error, initialized;
-      GPUQueue.prototype.submit = function (...args) {
-        const result = submit.apply(this, args);
-        if (!submitted) {
-          submitted = true;
-          const device = t.gpu.devices.at(-1);
-          queueMicrotask(() => device.dispatchEvent(new GPUUncapturedErrorEvent('uncapturederror', {
-            error: new GPUValidationError('Deliberate first-frame failure'),
-          })));
-        }
-        return result;
-      };
-      try { initialized = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 }); }
-      catch (cause) { error = cause; }
-      finally {
-        GPUQueue.prototype.submit = submit;
-        initialized?.dispose();
-      }
-      t.require(submitted && t.gpu.draws.length === 2 && t.gpu.dispatches.length === 1, 'Initialization never submitted its brush generation and rendering passes');
-      t.require(error instanceof Error, 'First-frame failure returned a ready renderer');
-      t.require(/Deliberate first-frame failure/.test(error.message), 'Initialization lost the native failure reason');
-      t.require(t.gpu.devices.every(device => t.gpu.destroyedDevices.has(device)), 'First-frame failure leaked its native device');
-      t.require(t.gpu.buffers.every(({ buffer, device }) => t.gpu.destroyedBuffers.has(buffer) || t.gpu.destroyedDevices.has(device)), 'First-frame failure leaked GPU buffers');
-      t.renderer = await t.api.createLandscape(t.canvas, { width: 200, height: 160, pixelRatio: 0.25 });
-      t.require(t.renderer.getStatus() === 'ready', 'First-frame failure retained canvas ownership');
-      t.require(t.gpu.devices.length === 2, 'Retry did not acquire a fresh native device');
-    }),
-  },
-  {
-    name: 'a canvas already using 2D reports an actionable WebGPU context error',
+    name: 'an existing 2D context reports an actionable transfer error',
     createRenderer: false,
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
       t.canvas.getContext('2d');
-      let message = '';
-      try { await t.api.createLandscape(t.canvas); } catch (error) { message = error.message; }
-      t.require(/WebGPU|context|surface/i.test(message), 'Missing context failure explanation');
+      const error = await t.rejects(() => t.api.createLandscape(t.canvas), 'Context-bound canvas transferred');
+      t.require(/fresh canvas.*context/i.test(error.message), 'Missing context-transfer explanation');
+      t.require(t.harness.current.metrics.devices.length === 0, 'Transfer failure unnecessarily acquired a device');
     }),
+  },
+  {
+    name: 'worker crashes reject active and queued requests without reviving the session',
+    async run({ page }) {
+      await page.evaluate(async () => {
+        const t = window.test;
+        await t.command('hold-fence');
+        const render = t.renderer.render({ cameraY: 200 });
+        const capture = t.renderer.capture();
+        const next = t.renderer.render({ cameraY: 240 });
+        t.outcomes = Promise.allSettled([render, capture, next]);
+      });
+      await page.waitForFunction(() => window.workerHarness.current.events.some(event => event.name === 'fence-held'));
+      await page.evaluate(() => window.test.command('crash'));
+      await page.evaluate(async () => {
+        const t = window.test, outcomes = await t.outcomes;
+        t.require(outcomes.every(outcome => outcome.status === 'rejected'), 'Worker crash left successful or unsettled requests');
+        t.require(t.renderer.getStatus() === 'error', 'Worker crash retained readiness');
+        t.require(t.harness.current.terminated, 'Worker crash retained its worker');
+        t.require(t.gpu.devices.every(device => t.gpu.destroyedDevices.includes(device)), 'Worker crash retained its device');
+        t.renderer.dispose();
+        t.renderer = await t.api.createLandscape(t.freshCanvas(), { width: 200, height: 160, pixelRatio: 0.25 });
+        t.require(t.renderer.getStatus() === 'ready', 'Fresh canvas did not recover after a crash');
+      });
+    },
   },
 ];

@@ -10,8 +10,9 @@ self.onmessage = async ({ data }) => {
     const before = await decodePNG((await landscape.capture()).blob);
     await new Promise(resolve => setTimeout(resolve, 0));
     const pending = landscape.capture();
-    landscape.render({ seed: 'worker-next' });
+    const next = landscape.render({ seed: 'worker-next' });
     const frame = await pending;
+    await next;
     const { pixels } = await decodePNG(frame.blob);
     self.postMessage({ ...pixelRange(pixels),
       meanDifference: comparePixels(before.pixels, pixels).meanAbsoluteChannelError,

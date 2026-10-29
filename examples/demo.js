@@ -17,6 +17,7 @@ let cameraX = 0;
 let dragging = null;
 let capturing = false;
 let pageClosed = false;
+let interactionRevision = 0;
 
 function reportError(error) {
   status.textContent = error instanceof Error ? error.message : String(error);
@@ -36,18 +37,23 @@ function cancelFrame() {
   frame = 0;
 }
 
-// Frame coalescing is this example's interaction policy. Rendering and image
-// capture correctness stay behind the landscape interface.
+// Animation frames collect DOM interactions; the renderer also coalesces work
+// while its worker is busy. Only the latest completed interaction updates status.
 function renderSoon(patch) {
   Object.assign(pending, patch);
+  interactionRevision++;
   if (frame || !landscape || landscape.getStatus() !== "ready") return;
-  frame = requestAnimationFrame(() => {
+  frame = requestAnimationFrame(async () => {
     frame = 0;
+    const request = pending;
+    const revision = interactionRevision;
+    pending = {};
     try {
-      landscape.render(pending);
-      pending = {};
-      if (landscape.getStatus() === "ready") showPosition();
-    } catch (error) { reportError(error); }
+      await landscape.render(request);
+      if (landscape.getStatus() === "ready" && revision === interactionRevision) showPosition();
+    } catch (error) {
+      if (landscape.getStatus() === "ready" && revision === interactionRevision) reportError(error);
+    }
   });
 }
 
@@ -91,6 +97,7 @@ async function initializeLandscape() {
   status.textContent = "Preparing the landscape…";
   try {
     const bounds = canvas.getBoundingClientRect();
+    // Creation permanently transfers this element. A remount needs a new canvas.
     const renderer = await createLandscape(canvas, {
       seed: seed.value,
       width: Math.max(1, Math.round(bounds.width)),
@@ -164,6 +171,7 @@ download.addEventListener("click", async () => {
   cancelFrame();
   const patch = pending;
   pending = {};
+  const revision = interactionRevision;
   capturing = true;
   syncSaveButton();
   try {
@@ -178,11 +186,11 @@ download.addEventListener("click", async () => {
     link.href = url;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    if (landscape.getStatus() === "ready") status.textContent = "PNG saved";
+    if (landscape.getStatus() === "ready" && revision === interactionRevision) status.textContent = "PNG saved";
   } catch (error) {
-    // Encoding can fail after a newer interaction has already rendered. Never
+    // Encoding can fail after a newer interaction has been requested. Never
     // replay the capture's settings over the user's current scene.
-    if (landscape.getStatus() === "ready") reportError(error);
+    if (landscape.getStatus() === "ready" && revision === interactionRevision) reportError(error);
   } finally {
     capturing = false;
     syncSaveButton();

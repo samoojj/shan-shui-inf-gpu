@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { installWorkerHarness } from './worker-harness.mjs';
 
-/** Every scenario owns its page, canvas, renderer, instrumentation, and teardown. */
+/** Every scenario owns its page, worker, canvas, renderer, and instrumentation. */
 export async function runScenario(browser, baseURL, scenario) {
   const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
   page.setDefaultTimeout(120000);
@@ -8,11 +9,11 @@ export async function runScenario(browser, baseURL, scenario) {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   try {
+    await page.addInitScript(installWorkerHarness);
     await page.goto(`${baseURL}/dist/index.js`);
     await page.setContent('<canvas id="test" width="320" height="256"></canvas>');
-    await page.evaluate(async ({ createRenderer, observeGPU }) => {
+    await page.evaluate(async createRenderer => {
       const api = await import('/dist/index.js');
-      const canvas = document.querySelector('#test');
       const require = (condition, message) => { if (!condition) throw new Error(message); };
       require(!!navigator.gpu, 'WebGPU is unavailable; use a WebGPU-capable browser on localhost or HTTPS.');
       const hash = bytes => {
@@ -21,69 +22,43 @@ export async function runScenario(browser, baseURL, scenario) {
         return value >>> 0;
       };
       const support = await import('/tests/browser/support.mjs');
-      const restores = [];
-      const gpu = { devices: [], adapterInfo: [], errors: [], counters: {}, writes: [], draws: [], dispatches: [], buffers: [], afterCreate: null, initialDraws: [], destroyedDevices: new Set(), destroyedBuffers: new Set(), restore() { for (const restore of restores.reverse()) restore(); } };
-      const wrap = (prototype, name, replacement) => {
-        const original = prototype[name];
-        prototype[name] = replacement(original);
-        restores.push(() => { prototype[name] = original; });
+      const harness = window.workerHarness;
+      const test = window.test = { api, canvas: document.querySelector('#test'), require, hash, ...support,
+        renderer: null, initial: null, harness,
+        inspect: () => harness.command('metrics'),
+        command: (name, args) => harness.command(name, args),
+        freshCanvas() {
+          const replacement = document.createElement('canvas');
+          replacement.width = 320; replacement.height = 256; replacement.id = 'test';
+          test.canvas.replaceWith(replacement);
+          test.canvas = replacement;
+          return replacement;
+        },
       };
-      wrap(GPUAdapter.prototype, 'requestDevice', original => async function (...args) {
-        const device = await original.apply(this, args);
-        gpu.devices.push(device);
-        gpu.adapterInfo.push({ vendor: this.info.vendor, architecture: this.info.architecture, description: this.info.description });
-        device.addEventListener('uncapturederror', event => gpu.errors.push(event.error.message));
-        return device;
-      });
-      if (observeGPU) {
-        const watch = (prototype, name) => {
-          gpu.counters[name] = 0;
-          wrap(prototype, name, original => function (...args) {
-            gpu.counters[name]++;
-            const result = original.apply(this, args);
-            if (name === 'createBuffer') gpu.buffers.push({ buffer: result, device: this, ...args[0] });
-            if (name === 'writeBuffer') {
-              const data = args[2];
-              gpu.writes.push({ buffer: args[0], bytes: args[4] === undefined ? data.byteLength : args[4] * (data.BYTES_PER_ELEMENT || 1) });
-            }
-            if (name === 'draw') gpu.draws.push(args);
-            if (name === 'dispatchWorkgroups') gpu.dispatches.push(args);
-            return result;
-          });
-        };
-        for (const name of ['createBuffer', 'createTexture', 'createRenderPipelineAsync', 'createComputePipelineAsync']) watch(GPUDevice.prototype, name);
-        for (const name of ['submit', 'writeBuffer', 'writeTexture', 'copyExternalImageToTexture']) watch(GPUQueue.prototype, name);
-        watch(GPURenderPassEncoder.prototype, 'draw');
-        watch(GPUComputePassEncoder.prototype, 'dispatchWorkgroups');
-        watch(GPUCommandEncoder.prototype, 'beginComputePass');
-        watch(GPUCommandEncoder.prototype, 'beginRenderPass');
-        watch(GPUCommandEncoder.prototype, 'copyTextureToBuffer');
-        watch(GPUBuffer.prototype, 'mapAsync');
-        wrap(GPUDevice.prototype, 'destroy', original => function (...args) { gpu.destroyedDevices.add(this); return original.apply(this, args); });
-        wrap(GPUBuffer.prototype, 'destroy', original => function (...args) { gpu.destroyedBuffers.add(this); return original.apply(this, args); });
-      }
-      const test = window.test = { api, canvas, require, hash, ...support, renderer: null, initial: null, gpu };
+      Object.defineProperty(test, 'gpu', { get: () => harness.current?.metrics });
       test.pixels = async () => (await test.decodePNG((await test.renderer.capture()).blob)).pixels;
       if (createRenderer) {
-        // Keep the original logical view while limiting software-rendered pixels.
-        // Full-size fidelity comparisons are separate from these API scenarios.
-        test.renderer = await api.createLandscape(canvas, { seed: 'browser-validation', width: 320, height: 256, pixelRatio: 0.25, cameraY: 160 });
-        gpu.afterCreate = { ...gpu.counters };
-        gpu.initialDraws = gpu.draws.slice();
+        test.renderer = await api.createLandscape(test.canvas, {
+          seed: 'browser-validation', width: 320, height: 256, pixelRatio: 0.25, cameraY: 160,
+        });
+        test.afterCreate = await test.inspect();
         test.initial = await test.pixels();
       }
-    }, { createRenderer: scenario.createRenderer !== false, observeGPU: !!scenario.observeGPU });
+    }, scenario.createRenderer !== false);
     await scenario.run({ page, baseURL });
-    const gpuErrors = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       window.test?.renderer?.dispose();
-      window.test?.gpu?.restore();
-      return window.test?.gpu?.errors ?? [];
+      // Demo sessions are private; pagehide is the public example's teardown path.
+      if (!window.test) window.dispatchEvent(new Event('pagehide'));
+      await window.workerHarness.terminated();
+      return { gpuErrors: window.workerHarness.workers.flatMap(worker => worker.metrics?.errors ?? []),
+        mainGPU: window.workerHarness.mainGPU };
     });
     assert.deepEqual(errors, [], `Unhandled browser errors in: ${scenario.name}`);
+    assert.deepEqual(result.mainGPU, { requestAdapter: 0, requestDevice: 0 }, 'Main thread acquired GPU resources');
     const expectedGPUErrors = scenario.expectedGPUErrors ?? [];
-    assert.equal(gpuErrors.length, expectedGPUErrors.length, `Unexpected WebGPU errors in: ${scenario.name}: ${gpuErrors.join('; ')}`);
-    for (const [index, expected] of expectedGPUErrors.entries()) assert.match(gpuErrors[index], expected);
-  } finally {
-    await page.close();
-  }
+    assert.equal(result.gpuErrors.length, expectedGPUErrors.length,
+      `Unexpected WebGPU errors in: ${scenario.name}: ${result.gpuErrors.join('; ')}`);
+    for (const [index, expected] of expectedGPUErrors.entries()) assert.match(result.gpuErrors[index], expected);
+  } finally { await page.close(); }
 }

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
 const publicPath = /^(?:examples\/[\w./-]+|dist\/[\w./-]+|index\.html)$/;
-const testPath = /^tests\/browser\/(?:support|capture-worker)\.mjs$/;
+const testPath = /^tests\/browser\/(?:support|capture-worker|instrumented-worker)\.mjs$/;
 export function serve(port = 4173, { tests = false } = {}) {
   return createServer(async (req, res) => {
     try {

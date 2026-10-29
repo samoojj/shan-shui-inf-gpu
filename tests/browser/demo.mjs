@@ -49,27 +49,22 @@ export const demoScenarios = [{
     });
     await page.goto(`${baseURL}/examples/`);
     await page.waitForFunction(() => /Ready|Position/.test(document.querySelector('#status')?.textContent || ''));
-    await page.evaluate(() => {
-      const canvas = document.querySelector('#landscape');
-      const original = canvas.toBlob;
-      canvas.toBlob = callback => {
-        window.rejectPendingEncoding = () => {
-          canvas.toBlob = original;
-          callback(null);
-        };
-      };
+    await page.evaluate(async () => {
+      await window.workerHarness.command('hold-encoding');
+      window.encodingsBefore = window.workerHarness.current.events.length;
       // Submit and capture in one task so the capture consumes the pending patch,
       // before the example's scheduled rendering frame can apply it separately.
       document.querySelector('#seed').value = 'capture-earlier-seed';
       document.querySelector('#controls').requestSubmit();
       document.querySelector('#download').click();
     });
-    await page.waitForFunction(() => typeof window.rejectPendingEncoding === 'function');
+    await page.waitForFunction(() => window.workerHarness.current.events.slice(window.encodingsBefore).some(event => event.name === 'encoding-started'));
     await page.getByLabel('Landscape seed', { exact: true }).fill('capture-later-seed');
     await page.getByRole('button', { name: 'Generate', exact: true }).click();
+    // The newer request is accepted while the earlier PNG is still encoding.
+    // Its frame follows the capture barrier when that encoding is released.
+    await page.evaluate(() => window.workerHarness.command('reject-encoding'));
     await page.waitForFunction(() => document.querySelector('#status').textContent.includes('capture-later-seed'));
-
-    await page.evaluate(() => window.rejectPendingEncoding());
     await page.waitForFunction(() => !document.querySelector('#download').disabled);
     await page.getByLabel('Zoom', { exact: true }).fill('1.8');
     await page.waitForFunction(() => document.querySelector('#zoom-value').value === '1.800×');

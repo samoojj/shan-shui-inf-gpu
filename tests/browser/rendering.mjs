@@ -21,12 +21,12 @@ export const renderingScenarios = [
       const t = window.test;
       const original = t.hash(t.initial), hashes = new Set([original]);
       for (const seed of ['another-seed', '山水', 12345678]) {
-        t.renderer.render({ seed }); hashes.add(t.hash(await t.pixels()));
+        await t.renderer.render({ seed }); hashes.add(t.hash(await t.pixels()));
       }
       t.require(hashes.size === 4, 'Distinct seeds must produce distinct images');
-      t.renderer.render({ seed: 'browser-validation' });
+      await t.renderer.render({ seed: 'browser-validation' });
       t.require(t.hash(await t.pixels()) === original, 'Restored seed changed pixels');
-      t.renderer.render();
+      await t.renderer.render();
       t.require(t.hash(await t.pixels()) === original, 'Identical repeated render changed pixels');
     }),
   },
@@ -36,15 +36,15 @@ export const renderingScenarios = [
       const t = window.test;
       // The original grows a stateful chunk cache. Warm both sides before
       // comparing repeated visits, so new offscreen objects are not introduced.
-      t.renderer.render({ cameraX: -600 });
-      t.renderer.render({ cameraX: 600 });
-      t.renderer.render({ cameraX: 0 });
+      await t.renderer.render({ cameraX: -600 });
+      await t.renderer.render({ cameraX: 600 });
+      await t.renderer.render({ cameraX: 0 });
       const origin = t.hash(await t.pixels());
-      t.renderer.render({ cameraX: -600 });
+      await t.renderer.render({ cameraX: -600 });
       const negative = t.hash(await t.pixels());
-      t.renderer.render({ cameraX: 600 }); t.renderer.render({ cameraX: -600 });
+      await t.renderer.render({ cameraX: 600 }); await t.renderer.render({ cameraX: -600 });
       t.require(t.hash(await t.pixels()) === negative, 'Cached negative view changed');
-      t.renderer.render({ cameraX: 0 });
+      await t.renderer.render({ cameraX: 0 });
       t.require(t.hash(await t.pixels()) === origin, 'Cached origin view changed');
     }),
   },
@@ -53,20 +53,21 @@ export const renderingScenarios = [
     async run({ page }) {
       const comparisons = await page.evaluate(async () => {
         const t = window.test, results = [];
-        t.renderer.resize(768, 256);
+        await t.renderer.resize(768, 256);
         const shift = 512 / t.renderer.getOptions().zoom;
-        const width = t.canvas.width, height = t.canvas.height;
+        const dimensions = await t.renderer.capture();
+        const width = dimensions.width, height = dimensions.height;
         const pixelShift = Math.round(512 * t.renderer.getOptions().pixelRatio);
         // Upstream culls by object origin, so a long distant mountain can pop
         // out when that origin crosses its 512-unit margin. These selected
         // pairs retain the distant motifs that cover their shared viewport.
         for (const start of [-625.125, 33.125]) {
-          t.renderer.render({ cameraX: start });
-          t.renderer.render({ cameraX: start + shift });
-          t.renderer.render({ cameraX: start }); const left = await t.pixels();
+          await t.renderer.render({ cameraX: start });
+          await t.renderer.render({ cameraX: start + shift });
+          await t.renderer.render({ cameraX: start }); const left = await t.pixels();
           // Original paper is screen-aligned and repeats every 512 pixels.
           // Shift one paper tile so the overlapping scene also shares its paper.
-          t.renderer.render({ cameraX: start + shift }); const right = await t.pixels();
+          await t.renderer.render({ cameraX: start + shift }); const right = await t.pixels();
           let total = 0, large = 0, count = 0;
           for (let y = 0; y < height; y++) for (let x = 0; x < width - pixelShift; x++) for (let c = 0; c < 3; c++) {
             const delta = Math.abs(left[(y * width + x + pixelShift) * 4 + c] - right[(y * width + x) * 4 + c]);
@@ -92,7 +93,8 @@ export const renderingScenarios = [
       t.renderer = await t.api.createLandscape(t.canvas, {
         seed: 'browser-validation', width: 768, height: 256, pixelRatio: 0.25, cameraY: -5000,
       });
-      const pixels = await t.pixels(), width = t.canvas.width, height = t.canvas.height;
+      const image = await t.renderer.capture();
+      const { pixels, width, height } = await t.decodePNG(image.blob);
       const shift = 128;
       let differences = 0;
       for (let y = 0; y < height; y++) for (let x = 0; x < width - shift; x++) for (let c = 0; c < 4; c++) {
@@ -105,14 +107,15 @@ export const renderingScenarios = [
     name: 'resize preserves scene settings and invalid updates are atomic',
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
-      t.renderer.render({ seed: 'resize-seed', zoom: 1.5, cameraX: -200 });
-      t.renderer.resize(80, 60, 2);
-      t.require(t.canvas.width === 160 && t.canvas.height === 120, 'Wrong backing dimensions');
+      await t.renderer.render({ seed: 'resize-seed', zoom: 1.5, cameraX: -200 });
+      await t.renderer.resize(80, 60, 2);
+      const resized = await t.renderer.capture();
+      t.require(resized.width === 160 && resized.height === 120, 'Wrong backing dimensions');
       const before = t.renderer.getOptions(), image = t.hash(await t.pixels());
       t.require(before.seed === 'resize-seed' && before.cameraX === -200 && before.zoom === 1.5, 'Resize reset scene options');
       await t.rejects(() => t.renderer.render({ seed: 'should-not-apply', zoom: 0 }), 'Invalid render did not throw');
       t.require(JSON.stringify(before) === JSON.stringify(t.renderer.getOptions()), 'Invalid render partially changed options');
-      t.renderer.render();
+      await t.renderer.render();
       t.require(t.hash(await t.pixels()) === image, 'Invalid render changed the image');
       const copy = t.renderer.getOptions(); copy.cameraX = 0; copy.zoom = 4; copy.seed = 'mutated';
       t.require(JSON.stringify(before) === JSON.stringify(t.renderer.getOptions()), 'Options expose mutable renderer state');
@@ -122,40 +125,103 @@ export const renderingScenarios = [
     name: 'GPU compute creates brush vertices and cached camera redraws upload only uniforms',
     observeGPU: true,
     run: ({ page }) => page.evaluate(async () => {
-      const t = window.test, gpu = t.gpu;
-      t.require(gpu.afterCreate.dispatchWorkgroups === 1, 'Initial scene did not dispatch brush generation');
-      t.require(gpu.afterCreate.beginComputePass === 1 && gpu.afterCreate.beginRenderPass === 2, 'Initial frame must compute brushes then render ink and paper');
-      t.require(gpu.initialDraws.length === 2, 'Initial frame must submit the ink and paper draws');
-      t.require(gpu.initialDraws[0][0] === 6 && gpu.initialDraws[0][1] > 0, 'Ink pass did not instance original path bounds');
-      t.require(gpu.initialDraws[1][0] === 3, 'Paper pass did not composite a fullscreen triangle');
+      const t = window.test, initial = t.afterCreate;
+      t.require(initial.counters.dispatchWorkgroups > 0, 'Initial scene did not dispatch GPU generation');
+      t.require(initial.counters.beginComputePass > 0 && initial.counters.beginRenderPass === 2, 'Initial frame must generate geometry then render ink and paper');
+      t.require(initial.draws.length === 2, 'Initial frame must submit ink and paper draws');
+      t.require(initial.draws[1][0] === 3, 'Paper pass did not composite a fullscreen triangle');
+      const gpu = await t.inspect();
       const generated = gpu.buffers.filter(buffer => /^GPU brush (vertices|bounds)$/.test(buffer.label));
-      t.require(generated.length === 2, 'Missing generated brush vertex or bounds buffer');
+      t.require(generated.length >= 2, 'Missing generated brush vertex or bounds buffers');
       for (const allocation of generated) {
         t.require(allocation.usage & GPUBufferUsage.STORAGE, 'Generated geometry is not GPU storage');
         t.require(!allocation.mappedAtCreation, 'Generated geometry was mapped for CPU initialization');
         t.require(!gpu.writes.some(write => write.buffer === allocation.buffer), 'Expanded brush geometry was uploaded by the CPU');
       }
-      t.require(gpu.counters.copyTextureToBuffer === 0 && gpu.counters.mapAsync === 0, 'Rendering used explicit GPU readback');
-      const before = { ...gpu.counters }, writes = gpu.writes.length, draws = gpu.draws.length, buffers = gpu.buffers.length;
-      t.renderer.render({ cameraY: t.renderer.getOptions().cameraY + 20 });
-      t.require(gpu.counters.dispatchWorkgroups === before.dispatchWorkgroups, 'Cached camera redraw recomputed brush geometry');
-      t.require(gpu.counters.beginRenderPass === before.beginRenderPass + 2, 'Camera redraw must render ink and paper');
-      t.require(gpu.counters.draw === before.draw + 2, 'Camera redraw must encode two rendering draws');
-      t.require(gpu.counters.submit === before.submit + 1, 'Render must submit one frame');
-      t.require(gpu.draws[draws][0] === 6 && gpu.draws[draws + 1][0] === 3, 'Camera redraw changed the rendering passes');
+      const before = await t.inspect();
+      await t.renderer.render({ cameraY: t.renderer.getOptions().cameraY + 20 });
+      const after = await t.inspect();
+      t.require(after.counters.dispatchWorkgroups === before.counters.dispatchWorkgroups, 'Cached redraw recomputed geometry');
+      t.require(after.counters.beginRenderPass === before.counters.beginRenderPass + 2, 'Camera redraw must render ink and paper');
+      t.require(after.counters.draw === before.counters.draw + 2, 'Camera redraw must encode two rendering draws');
       for (const name of ['createTexture', 'writeTexture', 'copyExternalImageToTexture', 'copyTextureToBuffer', 'mapAsync']) {
-        t.require(gpu.counters[name] === before[name], `Unexpected ${name} during normal render`);
+        t.require(after.counters[name] === before.counters[name], `Unexpected ${name} during cached render`);
       }
-      t.require(gpu.writes.slice(writes).every(write => write.bytes <= 512), 'Camera redraw uploaded more than uniforms');
-      t.require(gpu.buffers.slice(buffers).every(({ usage }) => !(usage & GPUBufferUsage.STORAGE)), 'Camera redraw allocated new geometry storage');
-      t.require(gpu.buffers.every(({ usage }) => !(usage & (GPUBufferUsage.VERTEX | GPUBufferUsage.INDEX))), 'Landscape uploaded a CPU vertex or index mesh');
+      t.require(after.writes.slice(before.writes.length).every(write => write.bytes <= 512), 'Camera redraw uploaded more than uniforms');
+      t.require(after.buffers.slice(before.buffers.length).every(({ usage }) => !(usage & GPUBufferUsage.STORAGE)), 'Camera redraw allocated geometry storage');
+      t.require(after.buffers.every(({ usage }) => !(usage & (GPUBufferUsage.VERTEX | GPUBufferUsage.INDEX))), 'Landscape uploaded a CPU mesh');
       const expected = t.hash(await t.pixels());
-      const unchanged = { ...gpu.counters }, nextDraw = gpu.draws.length;
-      t.renderer.render();
-      t.require(gpu.counters.dispatchWorkgroups === unchanged.dispatchWorkgroups, 'Unchanged view recomputed brush geometry');
-      t.require(gpu.counters.beginRenderPass === unchanged.beginRenderPass + 1, 'Unchanged view repainted the cached ink target');
-      t.require(gpu.counters.draw === unchanged.draw + 1 && gpu.draws[nextDraw][0] === 3, 'Unchanged view must only composite cached ink with paper');
-      t.require(t.hash(await t.pixels()) === expected, 'Reusing the cached ink target changed the PNG');
+      const unchanged = await t.inspect();
+      await t.renderer.render();
+      const repeated = await t.inspect();
+      t.require(repeated.counters.dispatchWorkgroups === unchanged.counters.dispatchWorkgroups, 'Unchanged view recomputed geometry');
+      t.require(repeated.counters.beginRenderPass === unchanged.counters.beginRenderPass + 1, 'Unchanged view repainted cached ink');
+      t.require(t.hash(await t.pixels()) === expected, 'Reusing cached ink changed the PNG');
     }),
+  },
+  {
+    name: 'render bursts coalesce and their promises wait for the GPU fence',
+    async run({ page }) {
+      await page.evaluate(async () => {
+        const t = window.test;
+        await t.command('hold-fence');
+        t.requestsBefore = t.harness.current.requests.length;
+        t.settled = 0;
+        t.pending = Promise.all(Array.from({ length: 50 }, (_, index) =>
+          t.renderer.render({ cameraY: index + 160 }).then(() => { t.settled++; })));
+      });
+      await page.waitForFunction(() => window.workerHarness.current.events.some(event => event.name === 'fence-held'));
+      await page.evaluate(async () => {
+        const t = window.test;
+        const requests = t.harness.current.requests.slice(t.requestsBefore);
+        t.require(requests.length === 1 && requests[0].options.cameraY === 209, 'A render burst was not coalesced into its latest frame');
+        t.require(t.settled === 0, 'Render promises resolved before GPU completion');
+        await t.command('stale-completion', { revision: requests[0].revision - 1 });
+        t.require(t.settled === 0, 'A stale worker completion resolved newer requests');
+        const queued = Promise.all(Array.from({ length: 30 }, (_, index) =>
+          t.renderer.render({ cameraY: index + 260 }).then(() => { t.settled++; })));
+        t.require(t.harness.current.requests.length === t.requestsBefore + 1, 'A busy worker received overlapping render operations');
+        await t.command('release-fence');
+        await Promise.all([t.pending, queued]);
+        t.require(t.settled === 80, 'Coalesced promises did not all settle after completed frames');
+        const sent = t.harness.current.requests.slice(t.requestsBefore);
+        t.require(sent.length === 2 && sent[1].options.cameraY === 289, 'A burst arriving during active work was not coalesced');
+        t.require(t.renderer.getOptions().cameraY === 289, 'Stale completion replaced current options');
+      });
+    },
+  },
+  {
+    name: 'the main-thread heartbeat continues throughout worker initialization and generation',
+    createRenderer: false,
+    async run({ page }) {
+      const measurements = await page.evaluate(async () => {
+        const t = window.test, beats = [];
+        const started = performance.now();
+        const timer = setInterval(() => beats.push(performance.now()), 16);
+        let interaction = false;
+        setTimeout(() => { interaction = true; }, 20);
+        try {
+          t.renderer = await t.api.createLandscape(t.canvas, {
+            width: 320, height: 256, pixelRatio: 0.25, seed: 'heartbeat',
+          });
+          await t.renderer.render({ seed: 'heartbeat-new-generation' });
+          // Fast hardware still needs enough elapsed time to observe event-loop ticks.
+          let generation = 0;
+          while (performance.now() - started < 100) {
+            await t.renderer.render({ seed: `heartbeat-fast-${++generation}` });
+          }
+        } finally { clearInterval(timer); }
+        const gpu = await t.inspect();
+        t.require(beats.length >= 3 && interaction, 'Generation prevented main-thread timers and interaction');
+        t.require(t.harness.mainGPU.requestAdapter === 0 && t.harness.mainGPU.requestDevice === 0, 'The main thread acquired GPU resources');
+        const gaps = beats.map((time, index) => time - (beats[index - 1] ?? started));
+        return { elapsedMs: performance.now() - started, heartbeatCount: beats.length,
+          maximumHeartbeatGapMs: Math.max(...gaps), uploadedBytes: gpu.uploadedBytes,
+          workerOperations: gpu.operations.map(operation => ({ type: operation.type,
+            elapsedMs: operation.completedAt - operation.startedAt })), adapter: gpu.adapterInfo[0] };
+      });
+      assert(measurements.maximumHeartbeatGapMs < 500, JSON.stringify(measurements));
+      console.log(`Worker responsiveness (software GPU, not a hardware benchmark): ${JSON.stringify(measurements)}`);
+    },
   },
 ];

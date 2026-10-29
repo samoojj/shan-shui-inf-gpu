@@ -2,122 +2,122 @@ import assert from 'node:assert/strict';
 
 export const captureScenarios = [
   {
-    name: 'capture redraws after a browser task and preserves image settings while the scene changes',
+    name: 'capture preserves its exact revision, PNG, and settings across newer render requests',
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
-      t.renderer.render({ seed: 'captured-scene', width: 192, height: 144, cameraY: 160 });
+      await t.renderer.render({ seed: 'captured-scene', width: 192, height: 144, cameraY: 160 });
       const expected = await t.pixels();
-      // Capture must redraw the requested scene after presentation has occurred.
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const pending = t.renderer.capture();
-      t.renderer.render({ seed: 'newer-scene', width: 160, height: 100 });
+      const next = t.renderer.render({ seed: 'newer-scene', width: 160, height: 100 });
       const frame = await pending;
-      t.require(frame.blob.type === 'image/png', 'Capture must return a PNG');
+      await next;
+      t.require(frame.blob.type === 'image/png', 'Capture did not return a PNG');
+      t.require(Number.isInteger(frame.revision) && frame.revision > 0, 'Capture omitted its request revision');
       t.require(frame.options.seed === 'captured-scene', 'Capture metadata followed a later render');
       t.require(frame.width === 48 && frame.height === 36, 'Capture dimensions followed a later resize');
-      t.require(frame.options.width === 192 && frame.options.height === 144, 'Capture lost its logical dimensions');
-      t.require(t.renderer.getOptions().seed === 'newer-scene', 'Capture changed the current scene');
+      t.require(frame.options.width === 192 && frame.options.height === 144, 'Capture lost logical dimensions');
+      t.require(t.renderer.getOptions().seed === 'newer-scene', 'Capture replaced the newer scene');
       const decoded = await t.decodePNG(frame.blob);
-      t.require(decoded.width === frame.width && decoded.height === frame.height, 'PNG dimensions disagree with capture metadata');
+      t.require(decoded.width === frame.width && decoded.height === frame.height, 'PNG dimensions disagree with metadata');
       const { meanAbsoluteChannelError } = t.comparePixels(expected, decoded.pixels);
-      t.require(meanAbsoluteChannelError < 0.1, `Captured PNG does not represent the requested scene: mean byte difference ${meanAbsoluteChannelError}`);
+      t.require(meanAbsoluteChannelError < 0.1, `Capture no longer represents its requested scene: ${meanAbsoluteChannelError}`);
     }),
   },
   {
-    name: 'invalid capture options are atomic and an already-started capture survives disposal',
+    name: 'capture barriers keep separate revisions between coalesced render bursts',
+    run: ({ page }) => page.evaluate(async () => {
+      const t = window.test;
+      const expectedA = await t.renderer.capture({ seed: 'barrier-a' });
+      const expectedB = await t.renderer.capture({ seed: 'barrier-b' });
+      const requests = [t.renderer.render({ seed: 'discarded-a' }), t.renderer.render({ seed: 'barrier-a' })];
+      const first = t.renderer.capture();
+      requests.push(t.renderer.render({ seed: 'discarded-b' }), t.renderer.render({ seed: 'barrier-b' }));
+      const second = t.renderer.capture();
+      requests.push(t.renderer.render({ seed: 'latest-c' }));
+      const [a, b] = await Promise.all([first, second]);
+      await Promise.all(requests);
+      t.require(a.revision < b.revision, 'Capture barriers lost request ordering');
+      for (const [actual, expected] of [[a, expectedA], [b, expectedB]]) {
+        const [actualImage, expectedImage] = await Promise.all([t.decodePNG(actual.blob), t.decodePNG(expected.blob)]);
+        t.require(actual.options.seed === expected.options.seed, 'Capture inherited settings across its barrier');
+        t.require(t.hash(actualImage.pixels) === t.hash(expectedImage.pixels), 'Capture barrier encoded the wrong scene');
+      }
+      t.require(t.renderer.getOptions().seed === 'latest-c', 'Capture completion replaced newer accepted options');
+    }),
+  },
+  {
+    name: 'invalid capture is atomic and an already-dispatched capture survives disposal',
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
       const before = JSON.stringify(t.renderer.getOptions());
-      await t.rejects(() => t.renderer.capture({ seed: 'invalid-patch', zoom: 0 }), 'Invalid capture options must reject');
+      await t.rejects(() => t.renderer.capture({ seed: 'invalid-patch', zoom: 0 }), 'Invalid capture did not reject');
       t.require(JSON.stringify(t.renderer.getOptions()) === before, 'Invalid capture partially changed settings');
       const pending = t.renderer.capture({ seed: 'before-disposal', cameraY: 160 });
       t.renderer.dispose();
       const frame = await pending;
       t.require(t.renderer.getStatus() === 'disposed', 'Capture revived a disposed renderer');
       t.require(frame.options.seed === 'before-disposal', 'Capture lost its settings snapshot');
-      const decoded = await t.decodePNG(frame.blob);
-      const { min, max } = t.pixelRange(decoded.pixels);
+      const { pixels } = await t.decodePNG(frame.blob);
+      const { min, max } = t.pixelRange(pixels);
       t.require(max - min > 30, 'Capture became blank after disposal');
-      await t.rejects(() => t.renderer.capture(), 'A disposed renderer must reject new captures');
+      await t.rejects(() => t.renderer.capture(), 'Disposed renderer accepted a new capture');
     }),
   },
   {
-    name: 'capture reports native device loss and failed PNG encoding through rejected promises',
-    observeGPU: true,
+    name: 'disposal rejects queued work but lets an encoding snapshot finish',
+    async run({ page }) {
+      await page.evaluate(async () => {
+        const t = window.test;
+        await t.command('hold-encoding');
+        t.encodingsBefore = t.harness.current.events.length;
+        t.startedCapture = t.renderer.capture({ seed: 'preserved-on-dispose' });
+      });
+      await page.waitForFunction(() => window.workerHarness.current.events.slice(window.test.encodingsBefore).some(event => event.name === 'encoding-started'));
+      await page.evaluate(async () => {
+        const t = window.test;
+        const queued = Promise.allSettled([
+          t.renderer.render({ seed: 'cancelled-render' }), t.renderer.capture({ seed: 'cancelled-capture' }),
+        ]);
+        t.renderer.dispose();
+        const outcomes = await queued;
+        t.require(outcomes.every(outcome => outcome.status === 'rejected'), 'Disposal did not reject all queued work');
+        await t.command('release-encoding');
+        const image = await t.startedCapture;
+        t.require(image.options.seed === 'preserved-on-dispose' && image.blob.size > 0, 'Started encoding was discarded');
+        await t.harness.terminated();
+        t.require(t.renderer.getStatus() === 'disposed', 'Late encoding changed terminal state');
+      });
+    },
+  },
+  {
+    name: 'PNG encoding failure rejects only the capture and later rendering succeeds',
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
-      const original = t.canvas.toBlob;
-      try {
-        t.canvas.toBlob = callback => callback(null);
-        await t.rejects(() => t.renderer.capture(), 'A null encoding result must reject capture');
-        t.require(t.renderer.getStatus() === 'ready', 'An encoding failure must not poison the renderer');
-      } finally { t.canvas.toBlob = original; }
-      const device = t.gpu.devices.at(-1);
-      t.require(!!device, 'Device-loss test requires the renderer’s native GPUDevice');
-      const lost = new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Renderer did not report native device loss')), 10000);
-        let unsubscribe = () => {};
-        unsubscribe = t.renderer.subscribe(state => {
-          if (state.status !== 'device-lost') return;
-          clearTimeout(timer); unsubscribe(); resolve();
-        });
-      });
-      device.destroy();
-      await lost;
-      const before = JSON.stringify(t.renderer.getOptions());
-      await t.rejects(() => t.renderer.capture({ seed: 'must-not-apply' }), 'A lost device must reject capture');
-      t.require(JSON.stringify(t.renderer.getOptions()) === before, 'A rejected capture changed the lost scene');
+      await t.command('fail-encoding');
+      const error = await t.rejects(() => t.renderer.capture(), 'Failed encoding resolved a PNG');
+      t.require(/PNG encoding failure/.test(error.message), 'Encoding failure lost its explanation');
+      t.require(t.renderer.getStatus() === 'ready', 'Encoding failure poisoned the session');
+      await t.renderer.render({ cameraY: 200 });
+      t.require((await t.renderer.capture()).blob.size > 0, 'Encoding failure prevented later captures');
     }),
   },
   {
-    name: 'capture rejects an asynchronous native draw failure even when PNG encoding succeeds',
-    observeGPU: true,
+    name: 'capture rejects an asynchronous native draw failure even when PNG encoding starts',
     expectedGPUErrors: [/Deliberate capture draw failure/],
     run: ({ page }) => page.evaluate(async () => {
-      const t = window.test;
-      const validPNG = (await t.renderer.capture()).blob;
-      t.require(validPNG.type === 'image/png' && validPNG.size > 0, 'Failure injection requires a valid PNG');
-      const device = t.gpu.devices.at(-1);
-      const queue = device.queue;
-      const submit = queue.submit;
-      const toBlob = t.canvas.toBlob;
-      const states = [];
-      const unsubscribe = t.renderer.subscribe(state => states.push(state.status));
-      let finishPNG;
-      let completeErrorDelivery;
-      const errorDelivered = new Promise(resolve => { completeErrorDelivery = resolve; });
-      try {
-        t.canvas.toBlob = callback => { finishPNG = () => callback(validPNG); };
-        queue.submit = function (...args) {
-          const result = submit.apply(this, args);
-          queueMicrotask(() => {
-            device.dispatchEvent(new GPUUncapturedErrorEvent('uncapturederror', {
-              error: new GPUValidationError('Deliberate capture draw failure'),
-            }));
-            completeErrorDelivery();
-          });
-          return result;
-        };
-        // Observe rejection immediately, even if the error arrives before encoding finishes.
-        const outcome = t.renderer.capture().then(() => ({ succeeded: true }), error => ({ error }));
-        await errorDelivered;
-        t.require(typeof finishPNG === 'function', 'Capture did not start its PNG encoder');
-        finishPNG();
-        const result = await outcome;
-        t.require(states.join(',') === 'ready,error', `Draw failure emitted incorrect states: ${states}`);
-        t.require(t.renderer.getStatus() === 'error', 'Native draw failure did not terminate renderer readiness');
-        t.require(result.error instanceof Error, 'Capture resolved a PNG after its native draw failed');
-        t.require(/Deliberate capture draw failure/.test(result.error.message), 'Capture lost the native failure reason');
-      } finally {
-        queue.submit = submit;
-        t.canvas.toBlob = toBlob;
-        unsubscribe();
-      }
+      const t = window.test, states = [];
+      t.renderer.subscribe(state => states.push(state.status));
+      await t.command('next-submit-error', { message: 'Deliberate capture draw failure' });
+      const error = await t.rejects(() => t.renderer.capture(), 'Capture resolved after a GPU failure');
+      t.require(/Deliberate capture draw failure/.test(error.message), 'Capture lost the GPU failure reason');
+      t.require(states.join(',') === 'ready,error', `GPU failure emitted incorrect states: ${states}`);
+      t.require(t.renderer.getStatus() === 'error', 'GPU failure retained readiness');
     }),
   },
   {
-    name: 'OffscreenCanvas captures a nonblank PNG and immutable scene settings in a module worker',
-    run: async ({ page, baseURL }) => {
+    name: 'OffscreenCanvas captures an exact nonblank PNG from a caller module worker',
+    async run({ page, baseURL }) {
       const result = await page.evaluate(async origin => {
         const worker = new Worker(`${origin}/tests/browser/capture-worker.mjs`, { type: 'module' });
         try {
@@ -134,10 +134,8 @@ export const captureScenarios = [
       assert.equal(result.type, 'image/png');
       assert.equal(result.seed, 'worker-capture');
       assert.equal(result.currentSeed, 'worker-next');
-      assert.equal(result.width, 32);
-      assert.equal(result.height, 24);
-      assert.equal(result.logicalWidth, 128);
-      assert.equal(result.logicalHeight, 96);
+      assert.equal(result.width, 32); assert.equal(result.height, 24);
+      assert.equal(result.logicalWidth, 128); assert.equal(result.logicalHeight, 96);
       assert(result.max - result.min > 30, JSON.stringify(result));
       assert(result.meanDifference < 0.1, JSON.stringify(result));
     },
