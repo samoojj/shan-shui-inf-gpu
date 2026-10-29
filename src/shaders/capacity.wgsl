@@ -15,16 +15,19 @@ export fn childCapacity(description: SceneObject) -> vec2u {
       case 2u: { return vec2u(8u, 256u); }
       // Seventy-two leaves plus the twenty-point trunk mask.
       case 3u: { return vec2u(73u, 1532u); }
-      case 7u: { return vec2u(4096u, 32768u); }
-      case 8u: { return vec2u(512u, 16384u); }
+      case 5u: { return vec2u(2048u, 32768u); }
+      case 7u: { return vec2u(4096u, 8192u); }
+      case 8u: { return vec2u(512u, 8192u); }
       default: { return vec2u(4096u, 131072u); }
     }
   }
   if (description.kind == LEAF_CLUSTER) { return vec2u(description.style, description.style * 21u); }
-  if (description.kind == BUILDING) { return vec2u(2048u, 65536u); }
+  // A seven-story pagoda uses fewer than 3,000 controls; this also covers
+  // the pavilion's two figures and the immutable 528-point shop plaque.
+  if (description.kind == BUILDING) { return vec2u(1024u, 8192u); }
   if (description.kind == ROCK) { return vec2u(128u, 1024u); }
   if (description.kind == TOWER) { return vec2u(64u, 4096u); }
-  if (description.kind == HUT) { return vec2u(1024u, 32768u); }
+  if (description.kind == HUT) { return vec2u(512u, 1024u); }
   if (description.kind == BOAT) { return vec2u(64u, 4096u); }
   if (description.kind == WATER) { return vec2u(16u, 4096u); }
   return vec2u(1u, 1u);

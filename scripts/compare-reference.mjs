@@ -14,6 +14,7 @@ await withBrowser(async ({ browser, baseURL }) => {
   for (const seed of (process.env.LANDSCAPE_SEEDS || '1234').split(',')) {
     const reference = await readFile(resolve('docs/images/original-1234.png'));
     const page = await browser.newPage({ viewport: { width: 1200, height: 700 } });
+    await page.route('**/favicon.ico', route => route.fulfill({ status: 204 }));
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
