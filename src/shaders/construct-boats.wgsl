@@ -1,4 +1,4 @@
-import { Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
+import { BOAT, Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
 import { writerFor, writerCounts } from "./construction.wgsl";
 import { boat } from "./motifs.wgsl";
 @group(0) @binding(0) var<storage, read> children: array<SceneObject>;
@@ -11,7 +11,7 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   let index = invocation.x;
   if (index >= arrayLength(&childCounts)) { return; }
   let description = children[index];
-  if (description.kind != 4u) { return; }
+  if (description.kind != BOAT) { return; }
   var writer = writerFor(description);
   boat(&writer, description.origin, description.size.x, description.size.y, description.flags != 0u);
   childCounts[index] = writerCounts(writer);

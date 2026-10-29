@@ -1,4 +1,4 @@
-import { SceneObject } from "./commands.wgsl";
+import { BOAT, DISTANT_MOUNTAIN, ISLAND, MOUNTAIN, WATER, SceneObject } from "./commands.wgsl";
 import { p5Noise } from "./noise.wgsl";
 import { hash, sampleRandom } from "./random.wgsl";
 struct Planning { seed: u32, firstChunk: i32, chunkCount: u32, padding: u32 }
@@ -23,12 +23,16 @@ fn object(kind: u32, origin: vec2f, randomState: ptr<function, u32>) -> SceneObj
   description.kind = kind; description.origin = origin; description.depth = origin.y;
   description.seed = max(1u, hash(*randomState ^ kind));
   description.rotation = sampleRandom(randomState) * 100.0;
-  switch kind {
-    case 1u: { description.size = vec2f(400.0 + sampleRandom(randomState) * 200.0, 100.0 + sampleRandom(randomState) * 400.0); }
-    case 2u: { description.size = vec2f(600.0 + sampleRandom(randomState) * 400.0, 100.0); description.perspective = 0.5 + sampleRandom(randomState) * 0.2; }
-    case 3u: { description.size = vec2f(f32(1u + u32(sampleRandom(randomState) * 3.0)) * 500.0, 150.0); }
-    case 4u: { description.size = vec2f(120.0, origin.y / 800.0); description.flags = u32(sampleRandom(randomState) * 2.0); }
-    default: {}
+  if (kind == MOUNTAIN) {
+    description.size = vec2f(400.0 + sampleRandom(randomState) * 200.0, 100.0 + sampleRandom(randomState) * 400.0);
+  } else if (kind == ISLAND) {
+    description.size = vec2f(600.0 + sampleRandom(randomState) * 400.0, 100.0);
+    description.perspective = 0.5 + sampleRandom(randomState) * 0.2;
+  } else if (kind == DISTANT_MOUNTAIN) {
+    description.size = vec2f(f32(1u + u32(sampleRandom(randomState) * 3.0)) * 500.0, 150.0);
+  } else if (kind == BOAT) {
+    description.size = vec2f(120.0, origin.y / 800.0);
+    description.flags = u32(sampleRandom(randomState) * 2.0);
   }
   return description;
 }
@@ -45,26 +49,26 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
       let rows = p5Noise(vec3f(position * 0.01, 3.141592653589793, 0.0), &noiseTable) * 480.0;
       for (var elevation = 0.0; elevation < rows; elevation += 30.0) {
         let origin = vec2f(position + (sampleRandom(&randomState) - 0.5) * 1000.0, elevation + 300.0);
-        let accepted = add(&records, &count, object(1u, origin, &randomState), 10.0);
+        let accepted = add(&records, &count, object(MOUNTAIN, origin, &randomState), 10.0);
       }
     }
-    if (abs(position) % 1000.0 < 4.0) { let accepted = add(&records, &count, object(3u, vec2f(position, 280.0 - sampleRandom(&randomState) * 50.0), &randomState), 10.0); }
+    if (abs(position) % 1000.0 < 4.0) { let accepted = add(&records, &count, object(DISTANT_MOUNTAIN, vec2f(position, 280.0 - sampleRandom(&randomState) * 50.0), &randomState), 10.0); }
   }
   for (var sample = 0u; sample < 103u; sample++) {
     let position = start + f32(sample) * 5.0;
     var occupied = false;
-    for (var index = 0u; index < count; index++) { if (records[index].kind == 1u && abs(records[index].origin.x - position) < 200.0) { occupied = true; break; } }
+    for (var index = 0u; index < count; index++) { if (records[index].kind == MOUNTAIN && abs(records[index].origin.x - position) < 200.0) { occupied = true; break; } }
     if (!occupied && sampleRandom(&randomState) < 0.01) {
       for (var row = 0u; f32(row) < sampleRandom(&randomState) * 4.0; row++) {
         let origin = vec2f(position + (sampleRandom(&randomState) - 0.5) * 1400.0, 700.0 - f32(row) * 50.0);
-        let accepted = add(&records, &count, object(2u, origin, &randomState), 10.0);
+        let accepted = add(&records, &count, object(ISLAND, origin, &randomState), 10.0);
       }
     }
   }
   for (var sample = 0u; sample < 103u; sample++) {
     if (sampleRandom(&randomState) < 0.2) {
       let origin = vec2f(start + f32(sample) * 5.0, 300.0 + sampleRandom(&randomState) * 390.0);
-      let accepted = add(&records, &count, object(4u, origin, &randomState), 400.0);
+      let accepted = add(&records, &count, object(BOAT, origin, &randomState), 400.0);
     }
   }
   // Water sorts behind every land object while retaining its mountain's anchor.
@@ -72,11 +76,13 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   for (var index = 0u; index < count; index++) {
     if (outputCount >= 128u) { atomicStore(&overflow[3], 1u); return; }
     var description = records[index];
-    if (description.kind == 1u) { description.rotation = 2.0 * f32(index) * sampleRandom(&randomState); }
-    if (description.kind == 2u) { description.rotation = 6.283185307179586 * sampleRandom(&randomState); }
+    if (description.kind == MOUNTAIN) {
+    description.rotation = 2.0 * f32(index) * sampleRandom(&randomState); }
+    if (description.kind == ISLAND) {
+    description.rotation = 6.283185307179586 * sampleRandom(&randomState); }
     candidates[invocation.x * 128u + outputCount] = description; outputCount++;
-    if (records[index].kind == 1u) {
-      var water = records[index]; water.kind = 5u; water.depth -= 10000.0; water.size = vec2f(800.0, 2.0); water.style = 10u;
+    if (records[index].kind == MOUNTAIN) {
+      var water = records[index]; water.kind = WATER; water.depth -= 10000.0; water.size = vec2f(800.0, 2.0); water.style = 10u;
       candidates[invocation.x * 128u + outputCount] = water; outputCount++;
     }
   }

@@ -1,4 +1,4 @@
-import { Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
+import { CHILD_BRUSH, Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
 @group(0) @binding(0) var<storage, read> objects: array<SceneObject>;
 @group(0) @binding(1) var<storage, read> children: array<SceneObject>;
 @group(0) @binding(2) var<storage, read> parentCounts: array<ObjectCounts>;
@@ -14,7 +14,7 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   var destination = offsets[index].x; var pointOffset = offsets[index].y;
   for (var local = 0u; local < parentCounts[index].commands; local++) {
     var brush = parentJobs[objects[index].commandBase + local];
-    if (brush.kind == 4u) {
+    if (brush.kind == CHILD_BRUSH) {
       let child = children[brush.controlOffset];
       let count = childCounts[brush.controlOffset].commands;
       for (var item = 0u; item < count; item++) {

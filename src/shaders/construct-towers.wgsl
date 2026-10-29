@@ -1,4 +1,4 @@
-import { Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
+import { TOWER, Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
 import { writerFor, writerCounts } from "./construction.wgsl";
 import { transmissionTower } from "./motifs.wgsl";
 @group(0) @binding(0) var<storage, read> children: array<SceneObject>;
@@ -11,7 +11,7 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   let index = invocation.x;
   if (index >= arrayLength(&childCounts)) { return; }
   let description = children[index];
-  if (description.kind != 10u) { return; }
+  if (description.kind != TOWER) { return; }
   var writer = writerFor(description);
   transmissionTower(&writer, description.origin, description.size.y, description.size.x);
   childCounts[index] = writerCounts(writer);

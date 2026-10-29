@@ -1,4 +1,4 @@
-import { Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
+import { LEAF_CLUSTER, TREE, Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
 import { writerFor, writerCounts } from "./construction.wgsl";
 import { tree, leafCluster } from "./trees.wgsl";
 @group(0) @binding(0) var<storage, read> children: array<SceneObject>;
@@ -11,9 +11,9 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   let index = invocation.x;
   if (index >= arrayLength(&childCounts)) { return; }
   let description = children[index];
-  if (description.kind != 6u && description.kind != 7u) { return; }
+  if (description.kind != TREE && description.kind != LEAF_CLUSTER) { return; }
   var writer = writerFor(description);
-  if (description.kind == 6u) { tree(&writer, description.style, description.origin, description.size.y, description.size.x, description.bend, description.color); }
+  if (description.kind == TREE) { tree(&writer, description.style, description.origin, description.size.y, description.size.x, description.bend, description.color); }
   else { leafCluster(&writer, description.origin, description.size.y, description.size.x, description.style, description.color); }
   childCounts[index] = writerCounts(writer);
 }

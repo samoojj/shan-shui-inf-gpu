@@ -1,4 +1,4 @@
-import { Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
+import { buildingStories, buildingDecoration, buildingHasRailing, BUILDING, Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
 import { writerFor, writerCounts } from "./construction.wgsl";
 import { building } from "./motifs.wgsl";
 @group(0) @binding(0) var<storage, read> children: array<SceneObject>;
@@ -11,8 +11,8 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   let index = invocation.x;
   if (index >= arrayLength(&childCounts)) { return; }
   let description = children[index];
-  if (description.kind != 8u) { return; }
+  if (description.kind != BUILDING) { return; }
   var writer = writerFor(description);
-  building(&writer, description.style, description.origin, description.size.x, description.size.y, description.rotation, description.perspective, description.flags & 255u, (description.flags >> 8u) & 255u, (description.flags & 65536u) != 0u);
+  building(&writer, description.style, description.origin, description.size.x, description.size.y, description.rotation, description.perspective, buildingStories(description), buildingDecoration(description), buildingHasRailing(description));
   childCounts[index] = writerCounts(writer);
 }

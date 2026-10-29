@@ -1,19 +1,20 @@
-# Native GPU primitive checks
+# Native GPU acceptance
 
-See the [verification guide](../../docs/verification.md) for commands, adapter
-setup, tolerances, measured results and artifact paths.
+Run `npm run test:gpu`. See [verification](../../docs/verification.md) for device
+setup, tolerances, results and artifacts. An unavailable device fails the run.
 
-The runner `tests/gpu-primitives.mjs` assembles independent probes:
+The runner assembles independent probes:
 
-- `noise.mjs` evaluates the production noise shader against captured upstream
-  values, including signs, fractions, three dimensions and wrapped coordinates.
-- `coordinates.mjs` uses the production packer and compute shader to compare
-  points and bounds. Cases exercise pointed endpoints, one-point strokes,
-  repeated points, angle wrapping, custom profiles, rotations, noise extremes
-  and reversed texture interpolation.
-- `raster.mjs` renders synthetic commands that isolate fill/stroke behavior.
-- `fixtures.mjs` decodes the [accepted data](../fixtures/README.md), rehydrating
-  shared contour grids. It contains no alternate implementation.
+- `noise.mjs`: original four-octave interpolation against captured noise values.
+- `coordinates.mjs`: GPU brush expansion and bounds from captured control data.
+  The fixture encoder in `tests/helpers` is not shipped with the library.
+- `raster.mjs`: white masks, ordered blending, winding, open strokes and joins.
+- `construction.mjs`: eight tree styles, captured tree coordinates, 96 island
+  layouts, iterative recursion, determinism and command/control/queue overflow.
+- `terrain.mjs`: mountain grids and vegetation, plateau geometry, distant
+  triangulation and rock contours against nine independent CPU captures.
+- `motifs.mjs`: architecture, figures, boats, water, plaque geometry and painter
+  order against thirteen captured constructions, plus intentional overflows.
 
-Native readback is test instrumentation. Production rendering does not read
-brush vertices or image pixels back to JavaScript.
+Native geometry readback is test instrumentation. Production reads only three
+16-byte allocation summaries when a seed or chunk range needs generation.

@@ -34,8 +34,7 @@ export const renderingScenarios = [
     name: 'cached views repeat after positive and negative camera excursions',
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test;
-      // The original grows a stateful chunk cache. Warm both sides before
-      // comparing repeated visits, so new offscreen objects are not introduced.
+      // Revisit regenerated chunk ranges: placement must not depend on visit order.
       await t.renderer.render({ cameraX: -600 });
       await t.renderer.render({ cameraX: 600 });
       await t.renderer.render({ cameraX: 0 });
@@ -58,9 +57,8 @@ export const renderingScenarios = [
         const dimensions = await t.renderer.capture();
         const width = dimensions.width, height = dimensions.height;
         const pixelShift = Math.round(512 * t.renderer.getOptions().pixelRatio);
-        // Upstream culls by object origin, so a long distant mountain can pop
-        // out when that origin crosses its 512-unit margin. These selected
-        // pairs retain the distant motifs that cover their shared viewport.
+        // The GPU planner retains a three-chunk margin for long distant ridges.
+        // Cross chunk boundaries in both directions and compare shared scenery.
         for (const start of [-625.125, 33.125]) {
           await t.renderer.render({ cameraX: start });
           await t.renderer.render({ cameraX: start + shift });
@@ -122,7 +120,7 @@ export const renderingScenarios = [
     }),
   },
   {
-    name: 'GPU compute creates brush vertices and cached camera redraws upload only uniforms',
+    name: 'GPU constructs scene descriptions and paths while cached redraws upload only uniforms',
     observeGPU: true,
     run: ({ page }) => page.evaluate(async () => {
       const t = window.test, initial = t.afterCreate;
@@ -131,7 +129,9 @@ export const renderingScenarios = [
       t.require(initial.draws.length === 2, 'Initial frame must submit ink and paper draws');
       t.require(initial.draws[1][0] === 3, 'Paper pass did not composite a fullscreen triangle');
       const gpu = await t.inspect();
-      const generated = gpu.buffers.filter(buffer => /^GPU brush (vertices|bounds)$/.test(buffer.label));
+      t.require(initial.uploadedBytes < 4096, 'Generation uploaded procedural data instead of scalar settings');
+      t.require(initial.counters.mapAsync === 3, 'Generation must read only three allocation summaries');
+      const generated = gpu.buffers.filter(buffer => (buffer.usage & GPUBufferUsage.STORAGE) && buffer.label !== 'allocation summary');
       t.require(generated.length >= 2, 'Missing generated brush vertex or bounds buffers');
       for (const allocation of generated) {
         t.require(allocation.usage & GPUBufferUsage.STORAGE, 'Generated geometry is not GPU storage');

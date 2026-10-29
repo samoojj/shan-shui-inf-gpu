@@ -1,4 +1,4 @@
-import { Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
+import { ROCK, Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
 import { writerFor, writerCounts } from "./construction.wgsl";
 import { rock } from "./rock.wgsl";
 @group(0) @binding(0) var<storage, read> children: array<SceneObject>;
@@ -11,7 +11,7 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   let index = invocation.x;
   if (index >= arrayLength(&childCounts)) { return; }
   let description = children[index];
-  if (description.kind != 9u) { return; }
+  if (description.kind != ROCK) { return; }
   var writer = writerFor(description);
   rock(&writer, description.origin, description.size, description.rotation, description.perspective);
   childCounts[index] = writerCounts(writer);

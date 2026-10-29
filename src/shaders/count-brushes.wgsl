@@ -1,4 +1,4 @@
-import { Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
+import { CHILD_BRUSH, Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
 @group(0) @binding(0) var<storage, read> objects: array<SceneObject>;
 @group(0) @binding(1) var<storage, read> parentCounts: array<ObjectCounts>;
 @group(0) @binding(2) var<storage, read> childCounts: array<ObjectCounts>;
@@ -13,7 +13,7 @@ fn cs_main() {
     let counts = parentCounts[index]; overflow |= counts.overflow;
     for (var local = 0u; local < counts.commands; local++) {
       let brush = parentJobs[objects[index].commandBase + local];
-      if (brush.kind == 4u) {
+      if (brush.kind == CHILD_BRUSH) {
         let child = childCounts[brush.controlOffset];
         commands += child.commands; points += child.points; overflow |= child.overflow;
       } else { commands++; points += brush.pointCount; }

@@ -1,4 +1,4 @@
-import { Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
+import { BOAT, DISTANT_MOUNTAIN, ISLAND, MOUNTAIN, WATER, Brush, SceneObject, ObjectCounts } from "./commands.wgsl";
 import { writerFor, writerCounts } from "./construction.wgsl";
 import { mountain, island, distantMountain } from "./terrain.wgsl";
 import { boat, water } from "./children.wgsl";
@@ -15,13 +15,16 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   if (index >= arrayLength(&objectCounts)) { return; }
   let description = objects[index];
   var writer = writerFor(description);
-  switch description.kind {
-    case 1u: { mountain(&writer, description.origin, description.size, description.rotation); }
-    case 2u: { island(&writer, description.origin, description.size, description.rotation, description.perspective); }
-    case 3u: { distantMountain(&writer, description.origin, description.size, description.rotation); }
-    case 4u: { boat(&writer, description.origin, description.size.x, description.size.y, description.flags != 0u); }
-    case 5u: { water(&writer, description.origin, description.size.x, description.size.y, description.style); }
-    default: {}
+  if (description.kind == MOUNTAIN) {
+    mountain(&writer, description.origin, description.size, description.rotation);
+  } else if (description.kind == ISLAND) {
+    island(&writer, description.origin, description.size, description.rotation, description.perspective);
+  } else if (description.kind == DISTANT_MOUNTAIN) {
+    distantMountain(&writer, description.origin, description.size, description.rotation);
+  } else if (description.kind == BOAT) {
+    boat(&writer, description.origin, description.size.x, description.size.y, description.flags != 0u);
+  } else if (description.kind == WATER) {
+    water(&writer, description.origin, description.size.x, description.size.y, description.style);
   }
   objectCounts[index] = writerCounts(writer);
 }

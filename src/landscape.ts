@@ -63,7 +63,7 @@ export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<La
   let scheduled = false;
   let disposalTimer: ReturnType<typeof setTimeout> | undefined;
   const initialized = deferred<void>();
-  const initializationTimer = setTimeout(() => fail(new Error("Landscape initialization timed out.")), 120000);
+  const initializationTimer = setTimeout(() => fail(new Error("Landscape initialization timed out.")), 360000);
 
   function notify(): void {
     const snapshot = state;

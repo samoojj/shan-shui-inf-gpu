@@ -6,6 +6,9 @@ import { gpuFixtures } from './gpu/fixtures.mjs';
 import { checkCoordinates } from './gpu/coordinates.mjs';
 import { checkNoise } from './gpu/noise.mjs';
 import { checkRaster } from './gpu/raster.mjs';
+import { checkConstruction } from './gpu/construction.mjs';
+import { checkTerrain } from './gpu/terrain.mjs';
+import { checkMotifs } from './gpu/motifs.mjs';
 
 const directory = new URL('../test-results/gpu-primitives/', import.meta.url);
 await rm(directory, { recursive: true, force: true });
@@ -26,13 +29,18 @@ try {
     noise: await checkNoise(gpu, fixture),
     coordinates: await checkCoordinates(gpu, fixture, packDrawing),
     raster: await checkRaster(gpu, packDrawing, directory),
+    construction: await checkConstruction(gpu),
+    terrain: await checkTerrain(gpu),
+    motifs: await checkMotifs(gpu),
   };
   await gpu.settled();
   assert.deepEqual(errors, [], 'Native GPU errors were reported');
   await writeFile(new URL('report.json', directory), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify({ execution: report.execution, noiseSamples: report.noise.samples,
     primitiveCases: report.coordinates.cases.length, generatedPoints: report.coordinates.pointCount,
-    maxCoordinateError: report.coordinates.maxError, artifacts: directory.pathname }, null, 2));
+    maxCoordinateError: report.coordinates.maxError, terrainCases: report.terrain.cases.length,
+    motifCases: report.motifs.cases.length, treeReferenceCases: report.construction.trees.references.length,
+    islandCases: report.construction.islands.cases, artifacts: directory.pathname }, null, 2));
 } finally {
   gpu.dispose();
 }

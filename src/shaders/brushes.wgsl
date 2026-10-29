@@ -1,5 +1,6 @@
-import { Brush } from "./commands.wgsl";
+import { CONTOUR_BRUSH, LEAF_BRUSH, POLYGON_BRUSH, RIBBON_BRUSH, Brush } from "./commands.wgsl";
 import { p5Noise } from "./noise.wgsl";
+import { originalAngle, leafNoise, leafPoint } from "./leaf-shape.wgsl";
 
 @group(0) @binding(0) var<storage, read> jobs: array<Brush>;
 @group(0) @binding(1) var<storage, read> inputData: array<vec4f>;
@@ -21,14 +22,8 @@ fn svgPoint(point: vec2f) -> vec2f {
   return vec2f(svgCoordinate(point.x), svgCoordinate(point.y));
 }
 
-fn originalAngle(delta: vec2f) -> f32 {
-  // JavaScript defines atan2(+0, +0) as zero; native WGSL results may differ.
-  if (all(delta == vec2f(0.0))) { return 0.0; }
-  return atan2(delta.y, delta.x);
-}
-
 fn centerPoint(job: Brush, index: u32) -> vec2f {
-  if (job.kind != 3u) {
+  if (job.kind != CONTOUR_BRUSH) {
     return inputData[job.controlOffset + index].xy;
   }
   let layer = job.layer;
@@ -64,7 +59,7 @@ fn expandRibbon(job: Brush) {
   for (var i = 1u; i + 1u < count; i++) {
     let next = points[base + i + 1u];
     var width = inputData[job.controlOffset + i].z;
-    if (job.kind == 3u) {
+    if (job.kind == CONTOUR_BRUSH) {
       width = job.width * sin(f32(i) / f32(count) * 3.141592653589793);
     }
     width = width * (1.0 - job.noiseAmount)
@@ -92,41 +87,20 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
     return;
   }
 
-  // Blob noise is corrected at the seam, then normalized as in loopNoise().
   var blobNoise: array<f32, 21>;
-  if (job.kind == 2u) {
-    for (var i = 0u; i < 21u; i++) {
-      blobNoise[i] = p5Noise(vec3f(f32(i) * 0.05, job.noiseOffset, 0.0), &noiseTable);
-    }
-    let difference = blobNoise[20] - blobNoise[0];
-    var low = 100.0;
-    var high = -100.0;
-    for (var i = 0u; i < 21u; i++) {
-      blobNoise[i] += difference * f32(20u - i) / 20.0;
-      low = min(low, blobNoise[i]);
-      high = max(high, blobNoise[i]);
-    }
-    for (var i = 0u; i < 21u; i++) {
-      blobNoise[i] = (blobNoise[i] - low) / (high - low);
-    }
-  }
+  if (job.kind == LEAF_BRUSH) { blobNoise = leafNoise(job.noiseOffset, &noiseTable); }
 
-  if (job.kind == 1u || job.kind == 3u) { expandRibbon(job); }
+  if (job.kind == RIBBON_BRUSH || job.kind == CONTOUR_BRUSH) { expandRibbon(job); }
 
   var minimum = vec2f(3.402823466e+38);
   var maximum = vec2f(-3.402823466e+38);
   for (var i = 0u; i < job.pointCount; i++) {
     var point: vec2f;
-    if (job.kind == 0u) {
+    if (job.kind == POLYGON_BRUSH) {
       point = inputData[job.controlOffset + i].xy;
-    } else if (job.kind == 2u) {
-      let p = f32(i) / 20.0 * 2.0;
-      let longitudinal = job.length * 0.5 - abs(p - 1.0) * job.length;
-      let transverse = inputData[job.profileOffset + i].x * job.width * 0.5;
-      let angle = originalAngle(vec2f(longitudinal, transverse)) + job.angle;
-      let radius = sqrt(longitudinal * longitudinal + transverse * transverse);
-      let variation = blobNoise[i] * job.noiseAmount + (1.0 - job.noiseAmount);
-      point = vec2f(cos(angle), sin(angle)) * radius * variation;
+    } else if (job.kind == LEAF_BRUSH) {
+      point = leafPoint(i, job.length, job.width, inputData[job.profileOffset + i].x,
+        job.angle, job.noiseAmount, blobNoise[i]);
     } else {
       point = points[job.pointOffset + i];
     }
