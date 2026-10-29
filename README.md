@@ -86,8 +86,12 @@ it in an effect and call `dispose()` in the effect’s cleanup.
 `render(patch?)` validates and applies a partial option update, then draws.
 `resize(width, height, pixelRatio?)` updates the drawing dimensions and draws.
 `getOptions()` returns a copy of the resolved options. `getStatus()` returns
-`"ready"`, `"context-lost"`, `"error"`, or `"disposed"`. `dispose()` releases the
-renderer. Recreate the renderer when you need it again after disposal.
+`"ready"`, `"context-lost"`, `"error"`, or `"disposed"`.
+`subscribe(listener)` delivers the current `{ status, error }` immediately and
+subsequent readiness changes; it returns an unsubscribe function.
+`capture(patch?)` returns a promise for a PNG and its scene metadata, as described
+below. `dispose()` releases the renderer and its subscriptions. Recreate the
+renderer when you need it again after disposal.
 
 Backing resolution is capped at 8,388,608 pixels and 8192 pixels per dimension
 (or the device limit, if lower), scaling down both dimensions together. Inspect
@@ -105,8 +109,23 @@ probing does not guarantee a later allocation will succeed.
 The renderer owns the canvas’s WebGL context. Use a dedicated canvas and do not
 share its context with another rendering engine. Context loss interrupts
 rendering; on restoration, the library rebuilds resources and redraws the last
-state. Listen to the canvas’s `webglcontextlost` and `webglcontextrestored` events
-if your UI needs to reflect that state.
+state. Subscribe to the renderer when your UI needs to reflect readiness:
+
+```ts
+const unsubscribe = landscape.subscribe(({ status, error }) => {
+  // Update your application's readiness indicator or fallback.
+  console.log(status);
+  if (error) console.error(error);
+});
+// Later, detach this observer without disposing the landscape:
+unsubscribe();
+```
+
+A native context-restored event is not proof that shaders and resources rebuilt
+successfully. Subscribers receive `"ready"` only after reconstruction and its
+first draw succeed; a failure produces `"error"` with the original error.
+The session remains unusable until disposed and recreated. Listener exceptions
+are reported to the browser without changing renderer readiness.
 
 Resize is explicit. A `ResizeObserver` can measure CSS dimensions and call
 `resize()`. Coalesce frequent pointer and resize events with
@@ -131,33 +150,43 @@ worker.postMessage({ canvas: offscreen }, [offscreen]);
 // landscape-worker.js
 import { createLandscape } from "shan-shui-gpu";
 
-self.onmessage = ({ data }) => {
+self.onmessage = async ({ data }) => {
   const landscape = createLandscape(data.canvas, {
     seed: "worker-landscape",
     width: 1200,
     height: 700,
   });
-  // Keep the renderer to apply later camera/resize messages, and dispose it
-  // before shutting down the worker.
+  try {
+    const image = await landscape.capture();
+    self.postMessage({ blob: image.blob, options: image.options });
+  } finally {
+    landscape.dispose();
+  }
 };
 ```
 
 ### Export
 
-For an HTML canvas, draw and invoke `toBlob()` in the same task:
+Capture works with both HTMLCanvasElement and OffscreenCanvas, including after
+asynchronous application work. The renderer owns drawing-buffer timing:
 
 ```ts
-landscape.render();
-canvas.toBlob((blob) => {
-  if (blob) {
-    // Upload, download, or display the PNG using your application’s UI.
-  }
-}, "image/png");
+const image = await landscape.capture({ seed: "evening-river" });
+// image.blob is a PNG; image.width/height are its actual backing dimensions.
+// image.options describes the captured scene, even if a newer frame exists.
+// Upload, download, or display image.blob using your application's UI.
 ```
 
+The optional patch is validated and applied before capture. A capture initiated
+while the context is lost, restoration has failed, or the renderer is disposed
+rejects without applying the patch. Invalid settings and encoding failures also
+reject. Once encoding has started, later renders or disposal do not change that
+capture's image or metadata. Use `image.options.seed` for filenames rather than
+reading the renderer's current seed after encoding.
+
 The normal draw path does not preserve the drawing buffer or read pixels back
-to JavaScript. Explicit image export does incur a browser readback. Exporting
-an SVG is not supported.
+to JavaScript. Explicit capture incurs a browser readback. SVG export is not
+supported.
 
 ## GPU work and performance
 
@@ -207,10 +236,17 @@ To use an installed Chromium and explicitly test software WebGL:
 CHROMIUM_EXECUTABLE=/usr/bin/chromium SWIFTSHADER=1 npm run test:browser
 ```
 
-The browser suite checks actual shader output, distinct/repeated seeds,
-pan-order independence and overlap, sizing, context restoration, cleanup,
-worker rendering, and example controls/export. It instruments the renderer to
-verify one draw per frame with no CPU geometry/texture uploads or pixel
-readbacks. The exported test image is written to `test-results/landscape.png`.
+The browser suite runs independent scenarios with fresh renderers. It checks
+actual shader output, distinct/repeated seeds, pan-order independence and
+overlap, sizing, automatic restoration, failed construction/recovery, cleanup,
+HTML/worker PNG capture, and example controls/export. Focused instrumentation
+verifies one draw per frame with no CPU geometry/texture uploads or pixel
+readbacks. PNG capture checks decode pixels and verify scene metadata even when
+the renderer changes or is disposed during encoding. The exported demo image is
+written to `test-results/landscape.png`.
 These are correctness checks; no hardware speedup or frame-rate guarantee is
 claimed.
+
+Use `BROWSER_TEST_FILTER='capture' npm run test:browser` to run matching browser
+scenarios. See [the architecture guide](docs/architecture.md) for module ownership,
+lifecycle invariants, and guidance for changing landscape composition.
