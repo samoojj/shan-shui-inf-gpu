@@ -1,6 +1,6 @@
-import { Job, View } from "./commands.wgsl";
+import { Brush, View } from "./commands.wgsl";
 
-@group(0) @binding(0) var<storage, read> jobs: array<Job>;
+@group(0) @binding(0) var<storage, read> jobs: array<Brush>;
 @group(0) @binding(1) var<storage, read> points: array<vec2f>;
 @group(0) @binding(2) var<storage, read> bounds: array<vec4f>;
 @group(0) @binding(3) var<uniform> view: View;
@@ -155,7 +155,7 @@ fn vs_main(@builtin(vertex_index) vertex: u32, @builtin(instance_index) command:
     vec2f(0.0, 1.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0));
   let box = bounds[command];
   // A miter may extend to four half-widths; reserve another pixel for AA.
-  let expansion = max(jobs[command].brush.w, 0.0) * 2.0 + max(view.span.x / view.resolution.x, view.span.y / view.resolution.y);
+  let expansion = max(jobs[command].outlineWidth, 0.0) * 2.0 + max(view.span.x / view.resolution.x, view.span.y / view.resolution.y);
   let world = mix(box.xy - vec2f(expansion), box.zw + vec2f(expansion), corners[vertex]);
   let clip = (world - view.offset) / view.span;
   return Vertex(vec4f(clip.x * 2.0 - 1.0, 1.0 - clip.y * 2.0, 0.0, 1.0), world, command);
@@ -164,17 +164,17 @@ fn vs_main(@builtin(vertex_index) vertex: u32, @builtin(instance_index) command:
 @fragment
 fn fs_main(vertex: Vertex) -> @location(0) vec4f {
   let job = jobs[vertex.command];
-  let count = job.extra.x;
+  let count = job.pointCount;
   if (count < 2u || (job.fill.a == 0.0 && job.edge.a == 0.0)) { discard; }
   let p = vertex.world;
   let aa = max(length(fwidth(p)) * 0.5, 1e-6);
   var winding = 0i;
   var fillDistanceSquared = 1e20;
   var outlineDistance = 1e20;
-  let radius = max(job.brush.w, 0.0) * 0.5;
+  let radius = max(job.outlineWidth, 0.0) * 0.5;
   for (var i = 0u; i < count; i++) {
-    let a = points[job.header.w + i];
-    let b = points[job.header.w + (i + 1u) % count];
+    let a = points[job.pointOffset + i];
+    let b = points[job.pointOffset + (i + 1u) % count];
     if (job.fill.a > 0.0) {
       if (nearSegment(p, a, b, aa)) {
         fillDistanceSquared = min(fillDistanceSquared, segmentDistanceSquared(p, a, b));
@@ -186,18 +186,18 @@ fn fs_main(vertex: Vertex) -> @location(0) vec4f {
     if (job.edge.a > 0.0 && radius > 0.0 && i + 1u < count) {
       outlineDistance = min(outlineDistance, strokeSegmentDistance(p, a, b, radius));
       if (i > 0u && nearJoin(p, a, radius)) {
-        outlineDistance = min(outlineDistance, joinDistance(p, previousDistinctPoint(job.header.w, i, a), a, b, radius));
+        outlineDistance = min(outlineDistance, joinDistance(p, previousDistinctPoint(job.pointOffset, i, a), a, b, radius));
       }
     }
   }
   var fillCoverage = select(0.0, 1.0, winding != 0);
   if (job.fill.a > 0.0 && fillDistanceSquared < aa * aa) {
-    fillCoverage = boundaryFillCoverage(p, job.header.w, count);
+    fillCoverage = boundaryFillCoverage(p, job.pointOffset, count);
   }
   let fillAlpha = job.fill.a * fillCoverage;
   var edgeCoverage = select(0.0, 1.0, outlineDistance <= 0.0);
   if (job.edge.a > 0.0 && radius > 0.0 && abs(outlineDistance) < aa) {
-    edgeCoverage = boundaryStrokeCoverage(p, job.header.w, count, radius);
+    edgeCoverage = boundaryStrokeCoverage(p, job.pointOffset, count, radius);
   }
   let edgeAlpha = job.edge.a * edgeCoverage;
   let alpha = edgeAlpha + fillAlpha * (1.0 - edgeAlpha);

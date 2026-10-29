@@ -1,11 +1,11 @@
-import type { Drawing, DrawingCommand, Point } from './commands.js';
+import type { Drawing, DrawingCommand, Point } from './fixture-commands.js';
 
 const JOB_BYTES = 128;
 const MAX_STORAGE_BYTES = 128 * 1024 * 1024;
 type Color = readonly [number, number, number, number];
 type Grid = { offset: number; rows: number; columns: number };
 
-/** Compact control data; the compute shader constructs all brush vertices. */
+/** Encode captured upstream commands for the independent brush acceptance probes. */
 export interface PackedDrawing {
   jobs: Uint8Array;
   inputData: Float32Array;

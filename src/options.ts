@@ -27,7 +27,7 @@ export function resolveOptions(patch: Partial<LandscapeOptions>, previous: Reado
   for (const key of Object.keys(patch)) if (!Object.prototype.hasOwnProperty.call(DEFAULT_OPTIONS, key)) throw new TypeError(`Unknown landscape option: ${key}`);
   const next = { ...previous, ...patch };
   if (typeof next.seed !== 'string' && (typeof next.seed !== 'number' || !Number.isFinite(next.seed))) throw new TypeError('seed must be a string or a finite number.');
-  if (encodeURIComponent(String(next.seed)).length > 96) throw new RangeError('seed must fit in 96 URL-encoded characters for the original seed algorithm.');
+  if (encodeURIComponent(String(next.seed)).length > 96) throw new RangeError('seed must fit in 96 URL-encoded characters to bound worker messages.');
   numberInRange('width', next.width, 1, 16384, true);
   numberInRange('height', next.height, 1, 16384, true);
   numberInRange('pixelRatio', next.pixelRatio, .25, 4);

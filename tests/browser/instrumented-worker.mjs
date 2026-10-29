@@ -10,7 +10,7 @@ let nextId = 0, nextSubmitError = configuration.firstFrameFailure, failEncoding 
 let holdEncoding = false, heldEncoding, holdFence = false;
 const fences = [];
 const gpu = { counters: {}, writes: [], draws: [], dispatches: [], buffers: [], adapterInfo: [], errors: [],
-  destroyedDevices: [], destroyedBuffers: [], operations: [], timings: [], uploadedBytes: 0 };
+  destroyedDevices: [], destroyedBuffers: [], operations: [], timings: [], uploadedBytes: 0, liveBufferBytes: 0, peakBufferBytes: 0 };
 const identify = value => {
   if (!ids.has(value)) ids.set(value, ++nextId);
   return ids.get(value);
@@ -57,7 +57,11 @@ for (const [prototype, names] of [
       const start = performance.now();
       const result = original.apply(this, args);
       gpu.timings.push({ name, start, end: performance.now() });
-      if (name === 'createBuffer') gpu.buffers.push({ ...args[0], buffer: identify(result), device: identify(this) });
+      if (name === 'createBuffer') {
+        gpu.buffers.push({ ...args[0], buffer: identify(result), device: identify(this) });
+        gpu.liveBufferBytes += args[0].size;
+        gpu.peakBufferBytes = Math.max(gpu.peakBufferBytes, gpu.liveBufferBytes);
+      }
       if (name === 'writeBuffer') {
         const data = args[2];
         const bytes = args[4] === undefined ? data.byteLength : args[4] * (data.BYTES_PER_ELEMENT || 1);
@@ -90,7 +94,9 @@ wrap(GPUDevice.prototype, 'destroy', original => function (...args) {
   return original.apply(this, args);
 });
 wrap(GPUBuffer.prototype, 'destroy', original => function (...args) {
-  gpu.destroyedBuffers.push(identify(this));
+  const id = identify(this);
+  if (!gpu.destroyedBuffers.includes(id)) gpu.liveBufferBytes -= gpu.buffers.find(buffer => buffer.buffer === id)?.size ?? 0;
+  gpu.destroyedBuffers.push(id);
   return original.apply(this, args);
 });
 wrap(OffscreenCanvas.prototype, 'convertToBlob', original => function (...args) {

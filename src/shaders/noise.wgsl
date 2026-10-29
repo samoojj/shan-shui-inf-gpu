@@ -1,5 +1,5 @@
-// p5's original four-octave noise. The caller supplies the 4096 values consumed
-// from the original JavaScript PRNG; WGSL must not generate a different table.
+// p5's original four-octave interpolation. Production generates the 4096 table
+// values on the GPU; acceptance tests can supply the captured upstream table.
 fn scaledCosine(value: f32) -> f32 {
   return 0.5 * (1.0 - cos(value * 3.141592653589793));
 }

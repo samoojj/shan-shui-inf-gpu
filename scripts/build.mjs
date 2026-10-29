@@ -26,10 +26,10 @@ execFileSync(process.execPath, [
 ], { cwd: root, stdio: "inherit" });
 
 // tsc owns declarations and declaration maps. The public entry is one self-contained
-// browser module; the separate options entry supports the internal Node unit tests.
+// browser module. GPU code stays in the worker; options supports internal Node tests.
 const result = await build({
   absWorkingDir: root,
-  entryPoints: ["src/index.ts", "src/options.ts"],
+  entryPoints: ["src/index.ts", "src/options.ts", "src/runtime/worker.ts"],
   outdir: "dist",
   bundle: true,
   platform: "browser",
@@ -77,7 +77,10 @@ const result = await build({
 });
 
 // Catch accidental imports of build tooling before they can reach the demo or npm consumers.
-for (const output of Object.values(result.metafile.outputs)) {
+for (const [outputPath, output] of Object.entries(result.metafile.outputs)) {
+  if (outputPath === "dist/index.js" && Object.keys(output.inputs).some(input => input.startsWith("src/gpu/") || input.endsWith(".wgsl"))) {
+    throw new Error("GPU implementation reached the main-thread facade.");
+  }
   for (const [input, contribution] of Object.entries(output.inputs)) {
     if (contribution.bytesInOutput > 0 && /@vgpu\/(adapter-node\/|wgsl\/dist\/(runtime\/|prepare\.js))/.test(input)) {
       throw new Error(`Build-only dependency reached the browser bundle: ${input}`);

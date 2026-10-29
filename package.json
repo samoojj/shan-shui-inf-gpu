@@ -1,7 +1,7 @@
 {
   "name": "shan-shui-gpu",
   "version": "0.1.0",
-  "description": "Lingdong Huang's procedural ink landscapes, ported to GPU brushes and rendering with WebGPU and vgpu.",
+  "description": "Procedural ink landscapes with GPU construction, WebGPU rendering and a worker-owned canvas.",
   "type": "module",
   "license": "MIT",
   "repository": {

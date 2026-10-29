@@ -11,7 +11,7 @@ const directory = new URL('../test-results/gpu-primitives/', import.meta.url);
 await rm(directory, { recursive: true, force: true });
 await mkdir(directory, { recursive: true });
 const fixture = await gpuFixtures();
-const { packDrawing } = await loadSource('src/scene/pack.ts');
+const { packDrawing } = await loadSource('tests/helpers/pack-fixtures.ts');
 // Compatibility adapters default storage access in vertex/fragment stages to zero.
 const gpu = await init({ requiredLimits: { maxStorageBuffersInVertexStage: 2, maxStorageBuffersInFragmentStage: 2 } });
 const errors = [];

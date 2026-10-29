@@ -20,12 +20,9 @@
     "rootDir": "src",
     "skipLibCheck": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "allowJs": true,
-    "checkJs": false
+    "noUnusedParameters": true
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.js"
+    "src/**/*.ts"
   ]
 }
