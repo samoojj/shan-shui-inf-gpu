@@ -1,17 +1,19 @@
 # Shan shui GPU
 
-A TypeScript library port of [Lingdong Huang’s shan-shui](https://github.com/LingDong-/shan-shui-inf)
-that preserves the original landscape construction and uses native WebGPU through
-[vgpu](https://github.com/vercel-labs/vgpu) **0.6.0** to generate brush geometry and
-render it. It includes the original mountains, rocks, eight tree styles,
-buildings, figures, boats, and water strokes.
+A TypeScript/WebGPU port of [Lingdong Huang’s shan-shui](https://github.com/LingDong-/shan-shui-inf),
+built with [vgpu](https://github.com/vercel-labs/vgpu) **0.6.0**. Native WGSL
+constructs and paints mountains, rocks, eight tree styles, buildings, figures,
+boats, water, and paper texture from the original procedural recipes.
 
-The implementation is hybrid. The CPU runs the original seeded planner,
-recursive motif construction, and topology decisions. GPU compute performs
-texture displacement, stroke expansion, and drawn leaf/blob geometry; GPU
-rendering composites the ordered paths and original paper pattern. This retains
-the original method while moving substantive generation and rendering work to
-the GPU. Output is a raster canvas with PNG capture.
+A dedicated module worker owns the OffscreenCanvas and GPU resources. The main
+thread validates options and exchanges requests; landscape planning, motif
+topology, control paths, brush geometry, bounds, and painting run on the GPU.
+The output is a raster canvas with PNG capture.
+
+The GPU version uses new random streams and independently seeded world chunks.
+An old seed does **not** reproduce the original application's composition.
+[Construction and seed differences](#fidelity-determinism-and-execution) are
+part of the port's contract.
 
 ## Build and try it
 
@@ -22,31 +24,42 @@ npm install
 npm run demo
 ```
 
-Open [localhost:4173/examples/](http://localhost:4173/examples/) in a browser with
-WebGPU support and an available adapter. WebGPU requires a secure context: use
-HTTPS in production; localhost works for development.
+Open [localhost:4173/examples/](http://localhost:4173/examples/) in a browser that
+supports module workers, OffscreenCanvas, and WebGPU inside workers. WebGPU
+requires HTTPS in production; localhost works for development.
 
 The example supports seed selection, horizontal dragging, keyboard panning,
-zoom, reset, and PNG export. Generating a seed returns the view to the original
-scale. It renders on input or resize, without a continuous animation loop.
+zoom, reset, and PNG export. It redraws on input or resize without a continuous
+animation loop.
 
-The package has not been published to a registry. Build it, then install it into
-another project from disk:
+The package has not been published to a registry. To use a local checkout:
 
 ```sh
 npm install /absolute/path/to/shan-shui-inf-gpu
 ```
 
-`dist/index.js` is a browser-ready ES module containing the library and vgpu
-runtime. The build prepares the native WGSL modules and their binding reflection;
-the browser bundle does not include the WGSL parser/resolver. Consumers need no
-WGSL loader. TypeScript declarations accompany the bundle.
+The build emits TypeScript declarations and two browser runtime entries:
+
+| File | Role |
+| --- | --- |
+| `dist/index.js` | Public facade: options, request queue, lifecycle, and worker messages |
+| `dist/runtime/worker.js` | Worker session, vgpu runtime, and prepared WGSL shaders |
+
+The WGSL parser and resolver run during the build. Consumers need no WGSL loader.
+Serve both entries from the application's origin, with the `runtime/worker.js`
+path intact relative to `index.js`. When using an application bundler, verify
+that it emits the worker
+asset and resolves `new URL("./runtime/worker.js", import.meta.url)` correctly;
+otherwise copy the worker to that resolved location. Content Security Policy
+must allow that worker URL through `worker-src` and permit module loading. A
+same-origin deployment normally uses `worker-src 'self'`.
 
 ## Use the library
 
 ```ts
 import { createLandscape } from "shan-shui-gpu";
 
+// This element must be fresh: do not call getContext() before creation.
 const canvas = document.querySelector<HTMLCanvasElement>("#landscape")!;
 const landscape = await createLandscape(canvas, {
   seed: "1234",
@@ -56,74 +69,89 @@ const landscape = await createLandscape(canvas, {
   zoom: 1.142,
 });
 
-// Creation resolves after setup and the initial draw.
-landscape.render({ cameraX: 400 });
-landscape.render({ seed: "quiet-morning", cameraX: 0 });
-landscape.resize(900, 600, 1.5);
+// Creation waits for setup, generation, and the first completed GPU frame.
+await landscape.render({ cameraX: 400 });
+await landscape.render({ seed: "quiet-morning", cameraX: 0 });
+await landscape.resize(900, 600, 1.5);
 
 const image = await landscape.capture();
-// image.blob is the PNG; image.options describes its captured settings.
+// image.blob: PNG; image.options: captured settings; image.revision: request ID.
+// image.width and image.height are the actual PNG dimensions.
 
 landscape.dispose();
+// Mount again with a new canvas; the transfer cannot be undone.
 ```
 
 Without an application bundler, import `../dist/index.js` from an example module
 and serve the files over localhost HTTP or HTTPS. Importing the package is safe
-during server-side rendering; GPU initialization begins at `createLandscape()`.
-For React or Next.js, create the renderer in a client effect and dispose it on
-cleanup. Also dispose a renderer whose asynchronous initialization finishes after
-the effect has already been cleaned up.
+during server-side rendering: import alone starts no worker and requests no GPU
+resources. Device setup happens inside the render worker.
+
+For React or Next.js, initialize in a client effect. Create and append a **fresh
+canvas for every effect setup**, including repeated setup in React Strict Mode;
+dispose the renderer and remove that element on cleanup. If asynchronous
+creation finishes after cleanup, immediately dispose the returned renderer.
+Reusing a retained canvas reference after cleanup cannot reverse its transfer.
 
 ### Options
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `seed` | `"1234"` | String or finite number; converted to a string and URL-encoded for the original seed routine. Maximum encoded length: 96 characters. |
-| `width`, `height` | Canvas dimensions | Integer logical dimensions, `1`–`16384`. If the canvas dimension is zero, the fallback is `1200` × `700`. Set CSS dimensions separately. |
+| `seed` | `"1234"` | String or finite number. `String(seed)` is the seed identity; its URL-encoded form must fit in 96 characters to bound worker messages. |
+| `width`, `height` | Canvas dimensions | Integer logical dimensions, `1`–`16384`. Zero canvas dimensions fall back to `1200` × `700`. Set CSS dimensions separately. |
 | `pixelRatio` | `1` | Backing resolution multiplier, `0.25`–`4`. |
-| `cameraX`, `cameraY` | `0`, `0` | Offset in original drawing coordinates, within ±8192. Positive y points downward. |
+| `cameraX`, `cameraY` | `0`, `0` | Drawing-coordinate offset, within ±8192. Positive y points downward. |
 | `zoom` | `1.142` | Logical screen pixels per drawing unit, `0.25`–`4`. The visible extent is `width / zoom` by `height / zoom`. |
 
-`DEFAULT_OPTIONS` is exported; its explicit dimensions are 1200 × 700.
-The original composition determines vegetation, mountain placement, water,
-colors, and ink density. Earlier approximation controls such as `layers`,
-`mist`, and `vegetation` are no longer accepted. Unknown options throw.
+`DEFAULT_OPTIONS` is exported with explicit dimensions of 1200 × 700. The visible
+width, `width / zoom`, must not exceed 8192 drawing units. Unknown options and
+invalid values reject the request without applying any part of its patch.
+
+### Requests and completion
 
 | Method | Behavior |
 | --- | --- |
-| `render(patch?)` | Validates a partial update and submits a draw. May generate newly requested landscape chunks on the CPU. |
-| `resize(width, height, pixelRatio?)` | Updates dimensions and draws. |
-| `getOptions()` | Returns a copy of the resolved settings. |
-| `getStatus()` | Returns `"ready"`, `"device-lost"`, `"error"`, or `"disposed"`. |
+| `render(patch?): Promise<void>` | Validates and queues settings. Resolves after its GPU frame, or a newer frame that superseded it through coalescing, finishes. |
+| `resize(width, height, pixelRatio?): Promise<void>` | Queues dimensions through the same rendering/completion path. The omitted ratio retains the latest requested ratio. |
+| `getOptions()` | Returns a copy of the latest accepted settings, including requests that are still pending. |
+| `getStatus()` | Returns `"ready"`, `"device-lost"`, `"error"`, or `"disposed"`. Ready means requests can be accepted, not that the queue is idle. |
 | `subscribe(listener)` | Delivers `{ status, error }` immediately and on state changes; returns an unsubscribe function. |
-| `capture(patch?)` | Draws and returns a promise for `{ blob, width, height, options }`. |
-| `dispose()` | Releases resources and subscriptions; safe to repeat. |
+| `capture(patch?)` | Returns `Promise<{ blob, width, height, options, revision }>` for that exact request. |
+| `dispose()` | Immediately marks the session disposed, cancels queued work, and starts worker/resource cleanup. Safe to repeat. |
 
-Backing resolution is capped at 8,388,608 pixels and 8192 pixels per dimension,
-or the device limit if lower. Both dimensions scale down together. Read
-`canvas.width`/`height` or capture metadata for actual output dimensions;
-`getOptions()` retains the requested logical dimensions and pixel ratio. This
-render-target cap does not cap the number of landscape commands in memory.
-The visible width (`width / zoom`) is limited to 8192 drawing units and is
-validated before generation, so a very wide canvas at minimum zoom cannot
-request tens of thousands of world units in one call.
+Consecutive render requests coalesce while waiting for the worker. Their
+promises remain pending until the replacement frame completes; a dropped
+intermediate request does not report premature completion. Captures form queue
+barriers and are never coalesced. Await a render when completion matters, and
+handle rejected promises even when an interaction does not need to wait.
+
+Resize is explicit. A `ResizeObserver` can measure CSS dimensions and request a
+resize. After transfer, use `resize()` to change backing dimensions; CSS sizing
+remains the caller's responsibility. The library installs no page event handlers
+or animation loop.
 
 ### Lifecycle and browser support
 
-`createLandscape()` and `isWebGPUSupported()` are asynchronous. Initialization
-rejects if options are invalid, WebGPU is unavailable, or device, pipeline, or
-resource setup fails. Catch this and show a suitable fallback.
+`createLandscape()` probes WebGPU in its worker before transferring the canvas,
+then resolves only after setup and the first frame complete. A capability query
+uses the same worker-side probe without claiming a canvas or requesting a device:
 
 ```ts
 import { isWebGPUSupported } from "shan-shui-gpu";
 
 if (await isWebGPUSupported()) {
-  // Adapter availability is a preliminary check; creation can still fail.
+  // Adapter availability is preliminary; device or resource setup can still fail.
 }
 ```
 
-A session owns its canvas until disposed; concurrent sessions cannot use the
-same canvas. Subscribe to readiness rather than inferring it from browser events:
+Only one session can own a canvas. **A successful canvas transfer is permanent.**
+Disposal, device loss, and failed GPU initialization cannot make that element or
+OffscreenCanvas transferable again. Recovery requires a new HTMLCanvasElement
+or OffscreenCanvas. Option validation, worker-loading failures, and failed
+support probes happen before transfer, so those failures permit retrying the
+same unused canvas. Device or pipeline setup failures occur after transfer.
+
+Subscribe to session state to keep controls in sync:
 
 ```ts
 const unsubscribe = landscape.subscribe(({ status, error }) => {
@@ -132,106 +160,113 @@ const unsubscribe = landscape.subscribe(({ status, error }) => {
 });
 ```
 
-Device loss and rendering errors are terminal for a session. Further render and
-resize calls throw; capture rejects. Dispose it and await a new
-`createLandscape()` call to start again. There is no automatic restoration or
-fallback backend. `unsubscribe()` detaches a listener; `dispose()` also releases
-all subscriptions.
+Device loss, worker errors, and GPU generation/rendering errors are terminal.
+Further render, resize, and capture requests reject. Dispose the failed session
+and create another with a fresh canvas; there is no automatic restoration or
+fallback backend. `unsubscribe()` detaches a listener, and disposal clears all
+subscriptions. Late worker messages cannot restore a terminal session.
 
-Resize is explicit. A `ResizeObserver` can measure CSS dimensions and call
-`resize()`. The demo coalesces pointer and resize events with
-`requestAnimationFrame`; the library installs no page event handlers or animation
-loop.
+Disposal rejects queued captures and render requests, including an active render
+whose completion has not been delivered. A capture already dispatched to the
+worker may finish before cleanup. Worker shutdown is bounded to 30 seconds so a
+stalled encoder cannot retain a disposed session indefinitely.
 
 ### OffscreenCanvas and capture
 
-The same interface accepts `OffscreenCanvas` where WebGPU is available in workers.
-Transfer an HTML canvas before initializing its renderer:
+HTML canvas transfer and worker creation are handled by the library. An unused
+OffscreenCanvas works with the same interface, including when called from
+another module worker:
 
 ```ts
-// Main thread
-const offscreen = canvas.transferControlToOffscreen();
-const worker = new Worker(new URL("./landscape-worker.js", import.meta.url), {
-  type: "module",
+const landscape = await createLandscape(new OffscreenCanvas(640, 480), {
+  seed: "quiet-morning",
 });
-worker.postMessage({ canvas: offscreen }, [offscreen]);
+const image = await landscape.capture();
+landscape.dispose();
 ```
 
-```ts
-// landscape-worker.js; adjust the module path for your project.
-import { createLandscape } from "./dist/index.js";
+`capture(patch?)` snapshots settings and a monotonically increasing request
+revision when accepted. The worker draws those settings, begins PNG encoding,
+and checks GPU completion. Later requests wait behind that capture's encoding
+barrier and cannot change its image or metadata. Use `image.options.seed` for a
+filename even if the caller has already accepted a newer seed.
 
-self.onmessage = async ({ data }) => {
-  let landscape;
-  try {
-    landscape = await createLandscape(data.canvas, {
-      seed: "1234", width: 1200, height: 700,
-    });
-    const image = await landscape.capture();
-    self.postMessage({ blob: image.blob, options: image.options });
-  } catch (error) {
-    self.postMessage({ error: String(error) });
-  } finally {
-    landscape?.dispose();
-  }
-};
-```
-
-`capture(patch?)` applies the requested settings, draws, and snapshots the PNG and
-its metadata together. Calls made after loss, failure, or disposal reject
-without applying the patch. Once encoding starts, subsequent renders or disposal
-do not relabel that image. Use `image.options.seed` for the filename, even if the
-user changes seeds while encoding. GPU submission or encoding errors reject.
-Normal draws do not read image pixels back to JavaScript; PNG capture does.
-There is no SVG export.
+PNG encoding failure rejects that capture without making the renderer unusable.
+A GPU or worker failure is terminal and rejects pending work. Calls made after
+loss, failure, or disposal reject without applying their patches. Capture
+returns a PNG, not SVG or an editable scene description.
 
 ## Fidelity, determinism, and execution
 
-The [upstream provenance](docs/upstream.md) identifies the original revision.
-The [architecture](docs/architecture.md#the-cpugpu-seam) defines the hybrid
-execution boundary. Random state is private to each scene.
+The [pinned upstream source](docs/upstream.md) supplies the construction studies
+for terrain, eight tree species, architecture, figures, boats, and brush
+primitives. The port implements those constructions in WGSL, including recursive
+branching through explicit stacks and geometry-dependent foliage triangulation.
+Its [architecture](docs/architecture.md#the-cpugpu-seam) documents the current
+execution boundary.
 
-Fresh sessions with the same seed and sequence of view requests reproduce the
-same composition. The original planner extends a cached world in requested
-chunk order: exploring new regions in a different order can produce different
-later content. This is not a position-hashed, order-independent infinite world.
-A capture records view settings, not the history needed to reconstruct every
-previously explored chunk. Changing to a different seed starts a fresh scene. An explicit empty string is
-also deterministic; the original application instead uses the current time
-when its seed query parameter is empty.
+Seed identity is reduced to a 32-bit hash in the worker. GPU integer hashing
+initializes noise and paper tables, and each chunk/object receives its own
+Xorshift stream. Numeric `1234` and string `"1234"` identify the same seed; an
+empty string is deterministic. The original global PRNG sequence and old
+seed-to-image mapping are not retained.
 
-The original also culls chunks by their anchor position with a 512-unit margin,
-not by their full shape. A long distant mountain can therefore disappear
-abruptly while panning when the camera reaches its anchor plus 512 units, even
-if part of the mountain would still be visible. This upstream behavior is retained.
+The world is planned in independent 512-unit horizontal chunks, with three
+extra chunks on each side of the visible range. Navigating in a different order
+does not consume a shared random stream or change the later contents of a chunk.
+The renderer retains the current range's painting and regenerates when its seed
+or chunk range changes; exploration does not accumulate an unlimited history.
 
-GPU `f32` calculations and raster antialiasing differ from JavaScript doubles
-and browser SVG rasterization. Exact pixel identity is not assumed. The original
-“Pizza Hut” label is retained using bundled Liberation Sans vector outlines in
-place of Verdana; this is an explicit font substitution. Pixel comparison with
-the upstream reference must report its viewport, seed/history, and measured
-tolerance rather than claim visual equivalence from reproducibility alone.
+For a fixed implementation and adapter, repeating a seed and view reproduces the
+image. This is not a promise of identical bytes across adapters, drivers, or
+versions: floating-point noise, branch thresholds, and rasterization can differ.
+GPU float32 arithmetic and canvas antialiasing also differ from the original
+JavaScript/SVG renderer. The original “Pizza Hut” plaque uses bundled Liberation
+Sans outlines in place of Verdana, an explicit font substitution.
 
-Generating a new seed or new chunks costs CPU time and allocates control data.
-Cached chunks remain for the session; wider exploration increases memory use.
-GPU cost depends on command count, brush samples, overlapping paths, and backing
-resolution. Start with pixel ratio 1 and redraw only when needed. No hardware
-speedup or frame-rate guarantee has been established. Software WebGPU results
-validate tested behavior, not hardware performance.
+The historical upstream screenshots and earlier hybrid-port comparisons are
+reference material. A full-scene comparison at an old seed cannot by itself
+measure the new renderer's raster accuracy, because the compositions differ.
+Current validation procedures and measurements belong to
+[the verification report](docs/verification.md).
+
+### Resource limits
+
+Backing resolution is capped at 8,388,608 pixels and 8192 pixels per dimension,
+or the device texture limit if lower. Both dimensions scale down together.
+Capture metadata gives the actual output dimensions; `getOptions()` retains the
+requested logical dimensions and pixel ratio.
+
+Generation storage has a **512 MiB live-buffer budget**. Each storage buffer must
+also fit the acquired device's `maxStorageBufferBindingSize`; the renderer uses
+default storage-buffer limits rather than requesting larger ones. Render
+targets, pipeline/device overhead, and browser bookkeeping are separate from
+this generation budget.
+
+GPU construction uses bounded arenas for each terrain object and decoration.
+An arena overflow or allocation-limit failure rejects the operation and puts
+the session into an error state; it does not paint a truncated scene. Recover
+with a fresh canvas and a narrower view or a different seed. Normal regeneration
+reads back three 16-byte allocation summaries, never generated paths or pixels;
+PNG capture is a separate explicit operation.
+
+Cost depends on the requested chunk range, geometry density, overlap, and backing
+resolution. Redraw only when needed and choose a suitable pixel ratio. No
+hardware speedup or frame-rate guarantee is claimed.
 
 ## Development and verification
 
-[Source studies](docs/upstream.md) document terrain, primitives, trees and motifs.
-[Architecture](docs/architecture.md) describes ownership and change boundaries.
-The [verification report](docs/verification.md) is the single guide to running
-checks, understanding their coverage and reviewing measured differences.
+[Architecture](docs/architecture.md) describes ownership, GPU stages, storage,
+and change boundaries. [Source studies](docs/upstream.md) record the upstream
+recipes and historical implementation details. [Verification](docs/verification.md)
+owns the check commands, their coverage, and measured limitations.
 
 ## Attribution and license
 
 The original algorithm and source are MIT-licensed, copyright 2018 Lingdong
-Huang; see [LICENSE](LICENSE). Ported composition modules retain that attribution
-and source locations. vgpu is an MIT-licensed dependency from Vercel Labs; see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The signage outlines derive from
+Huang; see [LICENSE](LICENSE). The WGSL port retains that provenance and source
+references. vgpu is an MIT-licensed dependency from Vercel Labs; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The plaque outlines derive from
 Liberation Sans under the [SIL Open Font License](licenses/LiberationSans-OFL.txt).
 
 Images in `screenshots/` are historical output of the original SVG application.
