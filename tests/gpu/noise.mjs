@@ -8,6 +8,7 @@ const tolerance = 2e-6;
 
 /** Compare production WGSL to accepted upstream samples and the captured noise table. */
 export async function checkNoise(gpu, fixture) {
+  await checkRandomStreams(gpu);
   const { positions, expected } = fixture.noise;
   const originalTable = fixture.table;
   assert.equal(originalTable.length, 4096, "Acceptance data must include the complete noise table");
@@ -68,4 +69,34 @@ export async function checkNoise(gpu, fixture) {
   } finally {
     pipeline.dispose();
   }
+}
+
+async function checkRandomStreams(gpu) {
+  const source = await readFile(new URL('../../src/shaders/random.wgsl', import.meta.url), 'utf8');
+  const resolved = await resolveShader({ entry: 'random-probe.wgsl', validate: 'off', modules: {
+    'random.wgsl': source,
+    'random-probe.wgsl': `import { sampleRandom } from "./random.wgsl";
+      @group(0) @binding(0) var<storage, read_write> values: array<u32>;
+      @compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id: vec3u) {
+        var state = id.x;
+        for (var i = 0u; i < 8u; i++) {
+          let sample = sampleRandom(&state);
+          values[id.x * 8u + i] = state;
+        }
+      }`,
+  }});
+  const values = storage(gpu, 3 * 8 * 4);
+  const pipeline = compute(gpu, prepareShader(resolved), { set: { values } });
+  try {
+    await pipeline.compile(); pipeline.dispatch(3);
+    const actual = new Uint32Array(await values.read());
+    for (let seed = 0; seed < 3; seed++) {
+      let state = seed || 0x6d2b79f5;
+      for (let i = 0; i < 8; i++) {
+        state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
+        assert.equal(actual[seed * 8 + i], state >>> 0);
+        assert.notEqual(state >>> 0, 0, 'Random stream became absorbing');
+      }
+    }
+  } finally { pipeline.dispose(); values.destroy(); }
 }

@@ -8,6 +8,8 @@ export fn hash(value: u32) -> u32 {
 
 export fn sampleRandom(state: ptr<function, u32>) -> f32 {
   var value = *state;
+  // Xorshift's zero state is absorbing; valid zero seeds need a live stream.
+  if (value == 0u) { value = 0x6d2b79f5u; }
   value ^= value << 13u;
   value ^= value >> 17u;
   value ^= value << 5u;
