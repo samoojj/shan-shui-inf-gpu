@@ -38,7 +38,13 @@ try {
   await gpu.settled();
   assert.deepEqual(errors, [], 'Native GPU errors were reported');
   await writeFile(new URL('report.json', directory), `${JSON.stringify(report, null, 2)}\n`);
-  console.log(JSON.stringify({ ...report, artifacts: directory.pathname }, null, 2));
+  console.log(JSON.stringify({ execution: report.execution, noiseSamples: report.noise.samples,
+    primitiveCases: report.coordinates.cases.length, generatedPoints: report.coordinates.pointCount,
+    maxCoordinateError: report.coordinates.maxError, terrainCases: report.terrain.cases.length,
+    motifCases: report.motifs.cases.length, treeReferenceCases: report.construction.trees.references.length,
+    controlledTreeCases: report.construction.controlledTrees.length,
+    controlledTreeCommands: report.construction.controlledTrees.reduce((total, item) => total + item.commands, 0),
+    islandCases: report.construction.islands.cases, artifacts: directory.pathname }, null, 2));
 } finally {
   gpu.dispose();
 }

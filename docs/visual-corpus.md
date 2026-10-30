@@ -1,53 +1,43 @@
-# Native-resolution construction evidence
+# Native visual corpus
 
-These unchanged 640×480 review images were generated from the preserved source
-revision [1953220](https://github.com/samoojj/shan-shui-inf-gpu/tree/1953220bfbf03a5b1133f503b4c71834b082e85e).
-Their constructor, shared brush and raster sources are identical to this branch.
-They are visual evidence, not independently captured numerical expectations or
-hardware performance results. The native corpus regeneration pipeline and full
-manifest join with scene assembly in stage 5. Open images at native size.
+Run `node scripts/visual-corpus.mjs` on a native WebGPU adapter. For a portable
+correctness run, install the vgpu software renderer and set `VGPU_ADAPTER=software`.
+The script emits exact 640×480 PNGs, an HTML gallery, and machine-readable
+`manifest.json` under `test-results/visual-corpus/`. Open PNGs at 1:1 pixels.
 
-- [motif-boat-person-zoom-1.png](images/visual-corpus/motif-boat-person-zoom-1.png)
-- [motif-boat-person-zoom-2.png](images/visual-corpus/motif-boat-person-zoom-2.png)
-- [motif-half-scale-boat-zoom-1.png](images/visual-corpus/motif-half-scale-boat-zoom-1.png)
-- [motif-half-scale-boat-zoom-2.png](images/visual-corpus/motif-half-scale-boat-zoom-2.png)
-- [motif-house-zoom-1.png](images/visual-corpus/motif-house-zoom-1.png)
-- [motif-house-zoom-2.png](images/visual-corpus/motif-house-zoom-2.png)
-- [motif-lattice-house-zoom-1.png](images/visual-corpus/motif-lattice-house-zoom-1.png)
-- [motif-lattice-house-zoom-2.png](images/visual-corpus/motif-lattice-house-zoom-2.png)
-- [motif-mirrored-boat-zoom-1.png](images/visual-corpus/motif-mirrored-boat-zoom-1.png)
-- [motif-mirrored-boat-zoom-2.png](images/visual-corpus/motif-mirrored-boat-zoom-2.png)
-- [motif-open-tower-zoom-1.png](images/visual-corpus/motif-open-tower-zoom-1.png)
-- [motif-open-tower-zoom-2.png](images/visual-corpus/motif-open-tower-zoom-2.png)
-- [motif-pagoda-zoom-1.png](images/visual-corpus/motif-pagoda-zoom-1.png)
-- [motif-pagoda-zoom-2.png](images/visual-corpus/motif-pagoda-zoom-2.png)
-- [motif-pavilion-zoom-1.png](images/visual-corpus/motif-pavilion-zoom-1.png)
-- [motif-pavilion-zoom-2.png](images/visual-corpus/motif-pavilion-zoom-2.png)
-- [motif-slatted-house-zoom-1.png](images/visual-corpus/motif-slatted-house-zoom-1.png)
-- [motif-slatted-house-zoom-2.png](images/visual-corpus/motif-slatted-house-zoom-2.png)
-- [motif-standing-person-zoom-1.png](images/visual-corpus/motif-standing-person-zoom-1.png)
-- [motif-standing-person-zoom-2.png](images/visual-corpus/motif-standing-person-zoom-2.png)
-- [motif-thatch-zoom-1.png](images/visual-corpus/motif-thatch-zoom-1.png)
-- [motif-thatch-zoom-2.png](images/visual-corpus/motif-thatch-zoom-2.png)
-- [motif-transmission-tower-zoom-1.png](images/visual-corpus/motif-transmission-tower-zoom-1.png)
-- [motif-transmission-tower-zoom-2.png](images/visual-corpus/motif-transmission-tower-zoom-2.png)
-- [motif-water-zoom-1.png](images/visual-corpus/motif-water-zoom-1.png)
-- [motif-water-zoom-2.png](images/visual-corpus/motif-water-zoom-2.png)
-- [rock-zoom-1.png](images/visual-corpus/rock-zoom-1.png)
-- [rock-zoom-2.png](images/visual-corpus/rock-zoom-2.png)
-- [tree-1-sparse-contours-zoom-1.png](images/visual-corpus/tree-1-sparse-contours-zoom-1.png)
-- [tree-1-sparse-contours-zoom-2.png](images/visual-corpus/tree-1-sparse-contours-zoom-2.png)
-- [tree-2-leaf-cluster-zoom-1.png](images/visual-corpus/tree-2-leaf-cluster-zoom-1.png)
-- [tree-2-leaf-cluster-zoom-2.png](images/visual-corpus/tree-2-leaf-cluster-zoom-2.png)
-- [tree-3-dense-canopy-zoom-1.png](images/visual-corpus/tree-3-dense-canopy-zoom-1.png)
-- [tree-3-dense-canopy-zoom-2.png](images/visual-corpus/tree-3-dense-canopy-zoom-2.png)
-- [tree-4-spreading-canopy-zoom-1.png](images/visual-corpus/tree-4-spreading-canopy-zoom-1.png)
-- [tree-4-spreading-canopy-zoom-2.png](images/visual-corpus/tree-4-spreading-canopy-zoom-2.png)
-- [tree-5-tiered-canopy-zoom-1.png](images/visual-corpus/tree-5-tiered-canopy-zoom-1.png)
-- [tree-5-tiered-canopy-zoom-2.png](images/visual-corpus/tree-5-tiered-canopy-zoom-2.png)
-- [tree-6-forked-bare-tree-zoom-1.png](images/visual-corpus/tree-6-forked-bare-tree-zoom-1.png)
-- [tree-6-forked-bare-tree-zoom-2.png](images/visual-corpus/tree-6-forked-bare-tree-zoom-2.png)
-- [tree-7-faceted-canopy-zoom-1.png](images/visual-corpus/tree-7-faceted-canopy-zoom-1.png)
-- [tree-7-faceted-canopy-zoom-2.png](images/visual-corpus/tree-7-faceted-canopy-zoom-2.png)
-- [tree-8-leaning-line-tree-zoom-1.png](images/visual-corpus/tree-8-leaning-line-tree-zoom-1.png)
-- [tree-8-leaning-line-tree-zoom-2.png](images/visual-corpus/tree-8-leaning-line-tree-zoom-2.png)
+An inspected software-adapter run is retained in
+[the gallery](images/visual-corpus/index.html), with a
+[navigation contact sheet](images/visual-corpus/contact-sheet.png) and
+[manifest](images/visual-corpus/manifest.json). It contains 28 cases and 56
+native-resolution PNGs. The contact sheet is a reduced navigation preview;
+the individual PNGs remain untouched. The manifest records all production
+WGSL source hashes, the test figure entry hash, adapter identity, source
+revision/dirty state, and each image's pixel hash.
+
+The corpus covers all eight tree constructions; all five island-decoration
+themes; the architectural/figure/boat/water fixture set; rocks; and a dense
+overlap composition. Every case renders at relative zoom 1 and 2. Set
+`VISUAL_CORPUS_FILTER=tree-4` to inspect one case and
+`VISUAL_CORPUS_ZOOMS=0.5,1,2` to change the zoom study.
+
+Tree and motif paths are generated by the production WGSL constructors, then
+passed through production child allocation, brush compaction, brush expansion,
+and rasterization. The figure wrapper is a test-only entry into the production
+person construction. The five island cases use independent CPU-captured child
+descriptors from the existing 96-case layout fixture, selected by their initial
+theme decision; their child paths are generated natively. The existing island
+acceptance test separately proves those descriptor layouts against native GPU
+output. This gallery does not claim to test terrain planning or reproduce an
+old whole-landscape seed.
+
+White backgrounds deliberately expose stroke edges, antialiasing, and white
+occluders without paper texture masking them. The dense scene lists authored
+objects in painter order. Whole-landscape paper and planning remain covered by
+the browser/landscape studies.
+
+These PNGs are review evidence, not a numerical oracle. Inspect silhouettes,
+branch attachment, canopy placement, building/figure proportions, occlusion,
+thin strokes, and edge coverage across zooms before approving a baseline.
+Never regenerate independent CPU geometry expectations from these outputs.
+Adapter identity and geometry counts are recorded; software rendering is not
+a hardware-performance benchmark.
