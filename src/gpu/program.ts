@@ -92,7 +92,8 @@ export async function createLandscapeProgram(
       layer.resize(size);
       ink.set({ view: { resolution: size, span: [options.width / options.zoom, options.height / options.zoom], offset: [options.cameraX, options.cameraY] } });
       composite.set({ paperView: { logicalSize: [options.width, options.height] } });
-      const viewKey = [size[0], size[1], options.width, options.height, options.zoom, options.cameraX, options.cameraY, options.presentation].join(":");
+      // Presentation controls how missing ink is painted, not completed ink's identity.
+      const viewKey = [size[0], size[1], options.width, options.height, options.zoom, options.cameraX, options.cameraY].join(":");
       const repaint = changed || paintedView !== viewKey;
       paintingStarted = performance.now();
       if (repaint && options.presentation === "incremental") {
