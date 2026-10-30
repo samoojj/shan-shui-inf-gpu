@@ -32,13 +32,15 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check:shaders": "node scripts/check-shaders.mjs",
-    "test:gpu": "node tests/gpu-primitives.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "test:visual": "node scripts/visual-corpus.mjs",
     "test:browser": "npm run build && node tests/browser.mjs",
+    "demo": "npm run build && node scripts/serve.mjs",
+    "prepack": "npm run build",
+    "compare:reference": "npm run build && node scripts/compare-reference.mjs",
+    "test:gpu": "node tests/gpu-primitives.mjs",
     "test:consumer": "npm run build && node tests/consumer.mjs",
     "benchmark": "npm run build && node scripts/benchmark.mjs",
-    "prepack": "npm run build"
+    "test:visual": "node scripts/visual-corpus.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

@@ -1,0 +1,124 @@
+{
+  "codeCommit": "72ee88949144841cb7009c25c8f057562a1110d3",
+  "native": {
+    "adapter": {
+      "vendor": "mesa",
+      "architecture": "software",
+      "device": "llvmpipe-llvm-19-1-7-256-bits-",
+      "description": "llvmpipe: Mesa 25.0.7 (LLVM 19.1.7) 0.0.1"
+    },
+    "execution": "software WebGPU; correctness checks only",
+    "noiseSamples": 260,
+    "primitiveCases": 18,
+    "generatedBrushPoints": 448,
+    "maxBrushCoordinateError": 0.00014648437490905053,
+    "terrainCases": 9,
+    "motifCases": 16,
+    "islands": {
+      "nativePipeline": true,
+      "tolerance": 0.002,
+      "cases": 96,
+      "totalChildren": 1723,
+      "largestIsland": 35,
+      "maximumError": 0.00011803124994003156,
+      "coverage": [
+        "6:4",
+        "6:5",
+        "6:6",
+        "6:7",
+        "6:8",
+        "7:5",
+        "8:1",
+        "9:0"
+      ],
+      "deterministic": true,
+      "exactRandomStateAndCounts": true,
+      "commandOverflowCases": 96,
+      "childQueueOverflowCases": 96
+    },
+    "treeReferences": [
+      {
+        "name": "sparse-contours",
+        "style": 1,
+        "scope": "complete",
+        "commands": 11,
+        "maximumError": 1.4787109364533535e-05
+      },
+      {
+        "name": "leaf-cluster",
+        "style": 2,
+        "scope": "complete",
+        "commands": 5,
+        "maximumError": 1.4968750008392817e-05
+      },
+      {
+        "name": "dense-canopy",
+        "style": 3,
+        "scope": "complete",
+        "commands": 73,
+        "maximumError": 2.7232421871303814e-05
+      },
+      {
+        "name": "faceted-canopy",
+        "style": 7,
+        "scope": "complete",
+        "commands": 172,
+        "maximumError": 5.393359373329076e-05
+      },
+      {
+        "name": "leaning-line-tree",
+        "style": 8,
+        "scope": "trunk-only",
+        "commands": 1,
+        "maximumError": 0.00011339453124037391
+      },
+      {
+        "name": "rim-leaf-cluster",
+        "style": 2,
+        "scope": "complete",
+        "commands": 2,
+        "maximumError": 1.4906249987234332e-05
+      }
+    ]
+  },
+  "fullSize": {
+    "seed": "1234",
+    "width": 1200,
+    "height": 700,
+    "firstFrameMs": 160669.5,
+    "workerOperations": [
+      {
+        "type": "initialize",
+        "options": {
+          "seed": "1234",
+          "width": 1200,
+          "height": 700,
+          "pixelRatio": 1,
+          "cameraX": 0,
+          "cameraY": 0,
+          "zoom": 1.142
+        },
+        "startedAt": 145,
+        "completedAt": 160635.19999999553
+      }
+    ],
+    "adapter": {
+      "vendor": "google",
+      "architecture": "swiftshader",
+      "description": ""
+    },
+    "uploadedBytes": 304,
+    "peakBufferBytes": 79964628,
+    "allocationReadbacks": 3,
+    "computeDispatches": 15,
+    "mainGPU": {
+      "requestAdapter": 0,
+      "requestDevice": 0
+    },
+    "heartbeatTicks": 14324,
+    "longestHeartbeatGapMs": 122.80000000447035,
+    "mainLongTasksMs": [],
+    "repeatedPixelsIdentical": true,
+    "comparison": "Different seed mapping: visual review only; no whole-image parity score."
+  }
+}
