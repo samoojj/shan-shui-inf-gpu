@@ -9,6 +9,7 @@ Construction studies available at this stage:
 - [Brush primitives](original-primitives.md)
 - [Terrain and planning](original-landscape.md)
 - [All eight trees](original-trees.md)
+- [Architecture, figures, boats and water](original-motifs.md)
 
 GPU chunks and objects use independent random streams. An equal text seed does
 not reproduce the old CPU composition. Same-adapter repeatability does not

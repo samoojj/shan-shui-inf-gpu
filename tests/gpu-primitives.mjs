@@ -8,6 +8,7 @@ import { checkNoise } from './gpu/noise.mjs';
 import { checkRaster } from './gpu/raster.mjs';
 import { checkConstruction } from './gpu/construction.mjs';
 import { checkTerrain } from './gpu/terrain.mjs';
+import { checkMotifs } from './gpu/motifs.mjs';
 import { checkPlanning } from './gpu/planning.mjs';
 
 const directory = new URL('../test-results/gpu-primitives/', import.meta.url);
@@ -31,6 +32,7 @@ try {
     raster: await checkRaster(gpu, packDrawing, directory),
     construction: await checkConstruction(gpu),
     terrain: await checkTerrain(gpu),
+    motifs: await checkMotifs(gpu),
     planning: await checkPlanning(gpu),
   };
   await gpu.settled();
