@@ -1,7 +1,7 @@
 # Original architecture, figures, boats, and water
 
 Source: [the pinned upstream implementation](upstream.md), principally lines
-2525–3704. See [architecture](verification.md) for the implemented port.
+2525–3704. See [architecture](architecture.md) for the implemented port.
 
 These motifs use the [shared brush and randomness contracts](original-primitives.md).
 White fills, open outlines and ordered alpha blending are essential to their overlaps.
@@ -180,5 +180,5 @@ therefore known only after some choices, and SVG text adds a different primitive
 type. A faithful GPU buffer layout must account for those counts rather than
 silently truncating motifs to a convenient fixed budget.
 
-The [architecture](verification.md) owns the implemented CPU/GPU
+The [architecture](architecture.md#the-cpugpu-seam) owns the implemented CPU/GPU
 boundary; the [verification report](verification.md) records its tested behavior.

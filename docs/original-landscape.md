@@ -277,5 +277,5 @@ tessellation, string creation, DOM rebuilding, and rasterization. Moving only
 the final raster image or already-generated CPU triangles to the GPU would not
 move the procedural construction.
 
-For the implemented processor split and ownership, see [architecture](verification.md).
+For the implemented processor split and ownership, see [architecture](architecture.md).
 For comparison procedures and measured differences, see [verification](verification.md).

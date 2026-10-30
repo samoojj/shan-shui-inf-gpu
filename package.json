@@ -9,12 +9,36 @@
     "url": "https://github.com/samoojj/shan-shui-inf-gpu.git"
   },
   "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./worker": "./dist/runtime/worker.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "examples",
+    "docs",
+    "GLOSSARY.md",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "licenses"
+  ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "check:shaders": "node scripts/check-shaders.mjs",
     "test:gpu": "node tests/gpu-primitives.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "test:visual": "node scripts/visual-corpus.mjs"
+    "test:visual": "node scripts/visual-corpus.mjs",
+    "test:browser": "npm run build && node tests/browser.mjs",
+    "test:consumer": "npm run build && node tests/consumer.mjs",
+    "benchmark": "npm run build && node scripts/benchmark.mjs",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -29,6 +53,5 @@
   },
   "dependencies": {
     "vgpu": "0.6.0"
-  },
-  "private": true
+  }
 }

@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { readFile, readdir, rm } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
@@ -28,16 +27,9 @@ execFileSync(process.execPath, [
 
 // tsc owns declarations and declaration maps. The public entry is one self-contained
 // browser module. GPU code stays in the worker; options supports internal Node tests.
-// Intermediate stack stages expose only the entries they implement.
-const entryPoints = ["src/index.ts", "src/options.ts", "src/runtime/worker.ts", "src/gpu/generation.ts"]
-  .filter(path => existsSync(join(root, path)));
-if (entryPoints.length === 0) {
-  console.log("GPU primitive sources ready; run check:shaders and test:gpu for native acceptance.");
-  process.exit(0);
-}
 const result = await build({
   absWorkingDir: root,
-  entryPoints,
+  entryPoints: ["src/index.ts", "src/options.ts", "src/runtime/worker.ts"],
   outdir: "dist",
   bundle: true,
   platform: "browser",

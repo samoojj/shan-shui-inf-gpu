@@ -117,6 +117,6 @@ Paper uses `245 + noise(i*.1,j*.1)*10 - random()*20`, with RGB multipliers
 random values after initial scene generation. A generic beige background and
 white fog are not equivalent to this composition.
 
-The [architecture](verification.md) describes which operations
+The [architecture](architecture.md#the-cpugpu-seam) describes which operations
 run on each processor. The [verification report](verification.md) records
 composition, coordinate and image checks.
