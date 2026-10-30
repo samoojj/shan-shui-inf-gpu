@@ -28,7 +28,44 @@ outline width are omitted because they are not painted. All 172 style-7 facets
 are compared, including their order and centroid-noise colors. Styles 4–6 and
 the style-8 branch network use the approved changed random consumption order;
 they receive native structural checks rather than a false same-seed parity
-claim.
+claim. Complete recipe comparisons for those four previously uncovered styles
+now live in `controlled-trees.json`, described below.
+
+## Controlled complete tree geometry
+
+`controlled-trees.json` adds independent complete ordered CPU drawings for styles
+4, 5, 6 and 8. It is captured with every random call fixed at `0.5` or `0.4`, and with the
+same captured float32 noise table supplied to the historical p5 implementation.
+Constant random input removes consumption-order differences while keeping branch
+selection, attachment, bark, twig construction and painter ordering testable.
+The style-8 cases include entire recursive branch networks, not just trunks:
+`0.5` selects one child at each recursive node and `0.4` selects two. The `0.5`
+cases also verify the source bark subdivision's endpoint-alias mutation before
+later branches attach.
+
+`node scripts/capture-controlled-trees.mjs` explicitly recaptures these expectations
+from the reviewed CPU source at `60e75d4`. That development command requires Git
+history and records SHA-256 hashes of all historical recipe/helper sources. It
+does not import or execute production WGSL. Acceptance reads only the frozen
+fixture and never regenerates its own expected output.
+
+`checkControlledTrees` compiles production tree construction with only the random
+leaf function replaced by the same constant in its test-only module map. It
+compares every emitted command's kind, control count, painted colors, outline,
+translated control coordinates, signed stroke widths, brush noise settings, and
+leaf parameters/profiles. The coordinate tolerance remains `0.002` drawing units.
+These complete controlled-input proofs complement the existing two random-stream
+structural/overflow cases; they do not claim complete same-seed CPU parity.
+The eight controlled cases contain 775 ordered commands and compare 28,402
+translated coordinate components, in addition to paint and brush parameters.
+The observed llvmpipe maximum error is `0.000457764` drawing units.
+
+These tests exposed a source alias dependency absent from the earlier port:
+upstream `div()` retains each subdivided run's final point by reference, so bark
+jitter moves branch-side controls before later branch attachment. Production now
+constructs that bark at the original geometry dependency point, then restores
+mask/outline/bark/twig painter order. The spreading tree's child bark uses copied
+translated sides upstream, and intentionally does not mutate its silhouette.
 
 Island expectations capture the original `flatDec` layout for 96 seeds,
 obtained by hashing consecutive integers starting at 982451653 with the agreed

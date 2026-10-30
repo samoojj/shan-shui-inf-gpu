@@ -143,6 +143,10 @@ presentation does not leave it reading a discarded surface.
 Independent chunk streams remove exploration-order dependence. Same-adapter
 repeatability does not establish exact cross-adapter agreement: floating-point
 noise and geometric thresholds can affect topology as well as raster pixels.
+Island occupancy also derives mountain candidates from two neighboring chunks
+on either side, including outside the generated range. A 500-unit mountain
+jitter plus a 200-unit exclusion radius fits that neighborhood; the result is
+independent of range edges and navigation history.
 The [upstream studies](upstream.md) describe the original CPU/SVG program;
 its global random history and old one-chunk culling policy are historical,
 not this renderer's execution contract.
@@ -186,6 +190,22 @@ accepted; the worker draws, snapshots the OffscreenCanvas in the submission
 task, and observes both PNG encoding and GPU completion before returning it.
 An encoder failure rejects only that capture. GPU/device/worker failure rejects
 pending work and makes the session terminal.
+
+`presentation: "incremental"` batches consecutive brush instances into a retained
+ink attachment. Only its first batch clears; each later batch loads existing
+ink, paints the next authored command interval and composites paper. Timer
+yields permit cancellation and allow hidden-document captures to progress.
+The final submission stays in the capture task before encoding begins.
+New renders may cancel an active incremental revision if no queued capture
+depends on its completion; its callers move to the replacement frame. A partial
+painting invalidates the cached view so its replacement clears before painting.
+
+Applications can pass a worker factory and an initialization AbortSignal in the
+third creation argument. These main-thread settings are not serialized. Abort
+terminates acquisition, compilation or first-frame painting before a handle is
+returned. The signal detaches on success. The `shan-shui-gpu/worker` export is a
+stable asset entry for application bundlers; the packed esbuild consumer tests
+this contract under a nested base path.
 
 Disposal immediately publishes `disposed`, rejects queued requests and an
 active render, and prevents later notifications from restoring readiness. An

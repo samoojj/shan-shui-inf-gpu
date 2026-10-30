@@ -9,6 +9,7 @@ import { checkRaster } from './gpu/raster.mjs';
 import { checkConstruction } from './gpu/construction.mjs';
 import { checkTerrain } from './gpu/terrain.mjs';
 import { checkMotifs } from './gpu/motifs.mjs';
+import { checkPlanning } from './gpu/planning.mjs';
 
 const directory = new URL('../test-results/gpu-primitives/', import.meta.url);
 await rm(directory, { recursive: true, force: true });
@@ -32,6 +33,7 @@ try {
     construction: await checkConstruction(gpu),
     terrain: await checkTerrain(gpu),
     motifs: await checkMotifs(gpu),
+    planning: await checkPlanning(gpu),
   };
   await gpu.settled();
   assert.deepEqual(errors, [], 'Native GPU errors were reported');
@@ -40,6 +42,8 @@ try {
     primitiveCases: report.coordinates.cases.length, generatedPoints: report.coordinates.pointCount,
     maxCoordinateError: report.coordinates.maxError, terrainCases: report.terrain.cases.length,
     motifCases: report.motifs.cases.length, treeReferenceCases: report.construction.trees.references.length,
+    controlledTreeCases: report.construction.controlledTrees.length,
+    controlledTreeCommands: report.construction.controlledTrees.reduce((total, item) => total + item.commands, 0),
     islandCases: report.construction.islands.cases, artifacts: directory.pathname }, null, 2));
 } finally {
   gpu.dispose();

@@ -1,0 +1,48 @@
+name: Verify landscape library
+on:
+  pull_request:
+  push:
+    branches: [codex/gpu-landscape-library, master]
+  workflow_dispatch:
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npx vgpu install-software-renderer
+      - run: npm run check:shaders
+      - run: npm run test:gpu
+        env:
+          VGPU_ADAPTER: software
+      - run: npm run test:visual
+        env:
+          VGPU_ADAPTER: software
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-acceptance
+          path: |
+            test-results/gpu-primitives
+            test-results/visual-corpus
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+        env:
+          SWIFTSHADER: 1
+      - run: npm run test:consumer
+        env:
+          SWIFTSHADER: 1

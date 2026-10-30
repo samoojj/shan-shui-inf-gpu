@@ -36,6 +36,28 @@ fn object(kind: u32, origin: vec2f, randomState: ptr<function, u32>) -> SceneObj
   }
   return description;
 }
+fn mountainCandidates(chunk: i32, randomState: ptr<function, u32>, records: ptr<function, array<SceneObject, 64>>, count: ptr<function, u32>) {
+  let start = f32(chunk) * 512.0;
+  for (var sample = 0u; sample < 103u; sample++) {
+    let position = start + f32(sample) * 5.0;
+    if (localMaximum(position)) {
+      let rows = p5Noise(vec3f(position * 0.01, 3.141592653589793, 0.0), &noiseTable) * 480.0;
+      for (var elevation = 0.0; elevation < rows; elevation += 30.0) {
+        let origin = vec2f(position + (sampleRandom(randomState) - 0.5) * 1000.0, elevation + 300.0);
+        let accepted = add(records, count, object(MOUNTAIN, origin, randomState), 10.0);
+      }
+    }
+    if (abs(position) % 1000.0 < 4.0) { let accepted = add(records, count, object(DISTANT_MOUNTAIN, vec2f(position, 280.0 - sampleRandom(randomState) * 50.0), randomState), 10.0); }
+  }
+}
+fn markMountainOccupancy(records: ptr<function, array<SceneObject, 64>>, count: u32, start: f32, occupied: ptr<function, array<bool, 103>>) {
+  for (var index = 0u; index < count; index++) {
+    if ((*records)[index].kind != MOUNTAIN) { continue; }
+    for (var sample = 0u; sample < 103u; sample++) {
+      if (abs((*records)[index].origin.x - (start + f32(sample) * 5.0)) < 200.0) { (*occupied)[sample] = true; }
+    }
+  }
+}
 @compute @workgroup_size(1)
 fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   if (invocation.x >= planning.chunkCount) { return; }
@@ -43,22 +65,25 @@ fn cs_main(@builtin(global_invocation_id) invocation: vec3u) {
   let start = f32(chunk) * 512.0;
   var randomState = max(1u, hash(planning.seed ^ bitcast<u32>(chunk)));
   var records: array<SceneObject, 64>; var count = 0u;
-  for (var sample = 0u; sample < 103u; sample++) {
-    let position = start + f32(sample) * 5.0;
-    if (localMaximum(position)) {
-      let rows = p5Noise(vec3f(position * 0.01, 3.141592653589793, 0.0), &noiseTable) * 480.0;
-      for (var elevation = 0.0; elevation < rows; elevation += 30.0) {
-        let origin = vec2f(position + (sampleRandom(&randomState) - 0.5) * 1000.0, elevation + 300.0);
-        let accepted = add(&records, &count, object(MOUNTAIN, origin, &randomState), 10.0);
-      }
-    }
-    if (abs(position) % 1000.0 < 4.0) { let accepted = add(&records, &count, object(DISTANT_MOUNTAIN, vec2f(position, 280.0 - sampleRandom(&randomState) * 50.0), &randomState), 10.0); }
+  mountainCandidates(chunk, &randomState, &records, &count);
+  var occupied: array<bool, 103>;
+  markMountainOccupancy(&records, count, start, &occupied);
+  // A mountain jitters at most 500 units and excludes another 200 units.
+  // Two neighboring chunks on either side cover every possible contributor.
+  // Derive them from world chunk IDs, even outside the requested view: occupancy
+  // must not depend on which range or navigation history generated this chunk.
+  var neighbors: array<SceneObject, 64>;
+  for (var offset = -2; offset <= 2; offset++) {
+    if (offset == 0) { continue; }
+    let neighborChunk = chunk + offset;
+    var neighborState = max(1u, hash(planning.seed ^ bitcast<u32>(neighborChunk)));
+    var neighborCount = 0u;
+    mountainCandidates(neighborChunk, &neighborState, &neighbors, &neighborCount);
+    markMountainOccupancy(&neighbors, neighborCount, start, &occupied);
   }
   for (var sample = 0u; sample < 103u; sample++) {
     let position = start + f32(sample) * 5.0;
-    var occupied = false;
-    for (var index = 0u; index < count; index++) { if (records[index].kind == MOUNTAIN && abs(records[index].origin.x - position) < 200.0) { occupied = true; break; } }
-    if (!occupied && sampleRandom(&randomState) < 0.01) {
+    if (!occupied[sample] && sampleRandom(&randomState) < 0.01) {
       for (var row = 0u; f32(row) < sampleRandom(&randomState) * 4.0; row++) {
         let origin = vec2f(position + (sampleRandom(&randomState) - 0.5) * 1400.0, 700.0 - f32(row) * 50.0);
         let accepted = add(&records, &count, object(ISLAND, origin, &randomState), 10.0);

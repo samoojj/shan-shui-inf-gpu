@@ -1,0 +1,875 @@
+{
+  "adapter": {
+    "description": "llvmpipe: Mesa 25.0.7 (LLVM 19.1.7) 0.0.1"
+  },
+  "sourceCommit": "8f55fe66a26bfcfeecdb7eebdd172f333335dc17",
+  "workingTreeDirty": true,
+  "dimensions": {
+    "width": 640,
+    "height": 480
+  },
+  "zooms": [
+    1,
+    2
+  ],
+  "purpose": "Inspect native construction and rasterization; not a whole-scene parity or performance claim.",
+  "cases": [
+    {
+      "name": "tree-1-sparse-contours",
+      "category": "tree",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 11,
+      "pointCount": 209,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "tree-1-sparse-contours-zoom-1.png",
+          "span": [
+            76.3599988301595,
+            57.26999912261963
+          ],
+          "pixelSha256": "3aa03855863ae8bc4cb4591636f259b283bd29d398dbc780c8a76dcb59c6f25d"
+        },
+        {
+          "zoom": 2,
+          "filename": "tree-1-sparse-contours-zoom-2.png",
+          "span": [
+            38.17999941507975,
+            28.634999561309815
+          ],
+          "pixelSha256": "73d606fc328593fde70d0073dd945c2f23a50f349d6b860ab36f5c81d38b7b15"
+        }
+      ]
+    },
+    {
+      "name": "tree-2-leaf-cluster",
+      "category": "tree",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 5,
+      "pointCount": 105,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "tree-2-leaf-cluster-zoom-1.png",
+          "span": [
+            35.26666812896728,
+            26.450001096725465
+          ],
+          "pixelSha256": "d87e1797bcb7a9a102583c8ac56bf33f5f36119675daeae3481aa633f28985a4"
+        },
+        {
+          "zoom": 2,
+          "filename": "tree-2-leaf-cluster-zoom-2.png",
+          "span": [
+            17.63333406448364,
+            13.225000548362733
+          ],
+          "pixelSha256": "3b92917e91b2d48096e4a4f98211ca2fafb6f92043d4a592e7ae559e926381a7"
+        }
+      ]
+    },
+    {
+      "name": "tree-3-dense-canopy",
+      "category": "tree",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 73,
+      "pointCount": 1532,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "tree-3-dense-canopy-zoom-1.png",
+          "span": [
+            72.98667017618814,
+            54.7400026321411
+          ],
+          "pixelSha256": "3f658e6f16d9b50191abbea59af3ff4c6276f69a83561363d31d21956d51fef4"
+        },
+        {
+          "zoom": 2,
+          "filename": "tree-3-dense-canopy-zoom-2.png",
+          "span": [
+            36.49333508809407,
+            27.37000131607055
+          ],
+          "pixelSha256": "f449e994e8f22accf099cbb01ecdd0a3899b94908f823837045155b2d01cec0c"
+        }
+      ]
+    },
+    {
+      "name": "tree-4-spreading-canopy",
+      "category": "tree",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 695,
+      "pointCount": 16328,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "tree-4-spreading-canopy-zoom-1.png",
+          "span": [
+            503.24000994364417,
+            377.4300074577331
+          ],
+          "pixelSha256": "f4e00126e426c52ce3eaddc6773a32a113bd282bcbf2b5d86b030deb4d44dfa8"
+        },
+        {
+          "zoom": 2,
+          "filename": "tree-4-spreading-canopy-zoom-2.png",
+          "span": [
+            251.62000497182208,
+            188.71500372886655
+          ],
+          "pixelSha256": "bd7a057398490017f0b42f337870bef2554dce629ec93e0badb9d232c7adf7f5"
+        }
+      ]
+    },
+    {
+      "name": "tree-5-tiered-canopy",
+      "category": "tree",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 226,
+      "pointCount": 6703,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "tree-5-tiered-canopy-zoom-1.png",
+          "span": [
+            523.6333611170451,
+            392.7250208377838
+          ],
+          "pixelSha256": "c7aefc61ecd0a07e5b69920e3e0f294aba4d76212a6353f1c7163c66fc0572e2"
+        },
+        {
+          "zoom": 2,
+          "filename": "tree-5-tiered-canopy-zoom-2.png",
+          "span": [
+            261.81668055852253,
+            196.3625104188919
+          ],
+          "pixelSha256": "6fbf4391db8e1797750393cbbd473c7593467cfb802d78fda4b7303f0e18c778"
+        }
+      ]
+    },
+    {
+      "name": "tree-6-forked-bare-tree",
+      "category": "tree",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 439,
+      "pointCount": 11244,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "tree-6-forked-bare-tree-zoom-1.png",
+          "span": [
+            467.8200005849202,
+            350.8650004386901
+          ],
+          "pixelSha256": "0e014fa7aae7df745bf1294615e09ad2f3736a354e6e4e95b59b130f41e8b68d"
+        },
+        {
+          "zoom": 2,
+          "filename": "tree-6-forked-bare-tree-zoom-2.png",
+          "span": [
+            233.9100002924601,
+            175.43250021934506
+          ],
+          "pixelSha256": "780e7e21a90aadc2de18e851d2b960bd00903ad20cca2b50fd174641df6b6fe0"
+        }
+      ]
+    },
+    {
+      "name": "tree-7-faceted-canopy",
+      "category": "tree",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 172,
+      "pointCount": 516,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "tree-7-faceted-canopy-zoom-1.png",
+          "span": [
+            98.74666900634764,
+            74.06000175476073
+          ],
+          "pixelSha256": "3ecb087371d24349c23ed1b9e8ee1ca21ca648554b127aa2772110ad94c535cc"
+        },
+        {
+          "zoom": 2,
+          "filename": "tree-7-faceted-canopy-zoom-2.png",
+          "span": [
+            49.37333450317382,
+            37.03000087738037
+          ],
+          "pixelSha256": "419b8570a9126b9c02c9c606a63ce630880005157c640e4315b932d67d873692"
+        }
+      ]
+    },
+    {
+      "name": "tree-8-leaning-line-tree",
+      "category": "tree",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 41,
+      "pointCount": 896,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "tree-8-leaning-line-tree-zoom-1.png",
+          "span": [
+            167.44000701904295,
+            125.5800052642822
+          ],
+          "pixelSha256": "f8dbbcdf6e8cabb6174a81c7efa60cea2744adf5d44529c09fbca2d45ce35315"
+        },
+        {
+          "zoom": 2,
+          "filename": "tree-8-leaning-line-tree-zoom-2.png",
+          "span": [
+            83.72000350952148,
+            62.7900026321411
+          ],
+          "pixelSha256": "c6b289ebf448f1a4f96b1766a158f5d156ce6f206452c82331c94db8c45d039d"
+        }
+      ]
+    },
+    {
+      "name": "island-boulders",
+      "category": "island-decoration",
+      "source": "independent CPU-captured island layout; child geometry constructed natively",
+      "descriptorCount": 16,
+      "seed": 1821789484,
+      "commandCount": 336,
+      "pointCount": 7347,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "island-boulders-zoom-1.png",
+          "span": [
+            529.3450561523437,
+            397.00879211425774
+          ],
+          "pixelSha256": "054b4a6d13ac9a44e24ef85bb0926255fb0dec37091e743e4801c0268745dea5"
+        },
+        {
+          "zoom": 2,
+          "filename": "island-boulders-zoom-2.png",
+          "span": [
+            264.67252807617183,
+            198.50439605712887
+          ],
+          "pixelSha256": "b519e6cb09c14d618240ac913e4212ac4b27938f37469d44514c604269261d9b"
+        }
+      ]
+    },
+    {
+      "name": "island-tiered-grove",
+      "category": "island-decoration",
+      "source": "independent CPU-captured island layout; child geometry constructed natively",
+      "descriptorCount": 27,
+      "seed": 1833749167,
+      "commandCount": 2091,
+      "pointCount": 60104,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "island-tiered-grove-zoom-1.png",
+          "span": [
+            530.4950561523438,
+            397.8712921142578
+          ],
+          "pixelSha256": "fe853fa9f97cace85d30e9a3cb7a8737b5ec536feb27eb35525f6e6b6a51d40f"
+        },
+        {
+          "zoom": 2,
+          "filename": "island-tiered-grove-zoom-2.png",
+          "span": [
+            265.2475280761719,
+            198.9356460571289
+          ],
+          "pixelSha256": "426ae9a61fbb3d11853218fab5c1925c920c177b3cb9e1313bef5573978bfbbe"
+        }
+      ]
+    },
+    {
+      "name": "island-spreading-trees",
+      "category": "island-decoration",
+      "source": "independent CPU-captured island layout; child geometry constructed natively",
+      "descriptorCount": 18,
+      "seed": 1625038525,
+      "commandCount": 1536,
+      "pointCount": 35152,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "island-spreading-trees-zoom-1.png",
+          "span": [
+            606.0500701904297,
+            454.5375526428223
+          ],
+          "pixelSha256": "e9dc5fd36a76ff74329a0466e34ba8555bcace0e90a860b2a796fc4bd68f8673"
+        },
+        {
+          "zoom": 2,
+          "filename": "island-spreading-trees-zoom-2.png",
+          "span": [
+            303.02503509521483,
+            227.26877632141114
+          ],
+          "pixelSha256": "75f7404557524914ca084578ddd95d722e6f585d85bf0674d25ba812427d15b1"
+        }
+      ]
+    },
+    {
+      "name": "island-forked-trees",
+      "category": "island-decoration",
+      "source": "independent CPU-captured island layout; child geometry constructed natively",
+      "descriptorCount": 6,
+      "seed": 451777170,
+      "commandCount": 609,
+      "pointCount": 14489,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "island-forked-trees-zoom-1.png",
+          "span": [
+            564.994985961914,
+            423.74623947143556
+          ],
+          "pixelSha256": "5906147e3d8eb776968d8faf52c3ade335fc095ea1c0dfbf8b6a5eb94311fe0b"
+        },
+        {
+          "zoom": 2,
+          "filename": "island-forked-trees-zoom-2.png",
+          "span": [
+            282.497492980957,
+            211.87311973571778
+          ],
+          "pixelSha256": "f2b300973846fa7902622774a698d519553109a90e050bc843fd854a4823274d"
+        }
+      ]
+    },
+    {
+      "name": "island-faceted-grove",
+      "category": "island-decoration",
+      "source": "independent CPU-captured island layout; child geometry constructed natively",
+      "descriptorCount": 20,
+      "seed": 910670584,
+      "commandCount": 1478,
+      "pointCount": 9382,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "island-faceted-grove-zoom-1.png",
+          "span": [
+            530.8399719238281,
+            398.1299789428711
+          ],
+          "pixelSha256": "d669475db98889c972190cdcdd27cb5ca7f187dbb625ddca3716a19dfbd218be"
+        },
+        {
+          "zoom": 2,
+          "filename": "island-faceted-grove-zoom-2.png",
+          "span": [
+            265.41998596191405,
+            199.06498947143555
+          ],
+          "pixelSha256": "42593470b39246281efe89c1c033bfe6b3fc1f0c9506b8317fa33fbc344c300a"
+        }
+      ]
+    },
+    {
+      "name": "motif-thatch",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 172,
+      "pointCount": 703,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-thatch-zoom-1.png",
+          "span": [
+            206.99999999999997,
+            155.24999999999997
+          ],
+          "pixelSha256": "1055aa35b0e717236f14e12f77ab36e95cf17423a4737cdf2c4e768749d8af68"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-thatch-zoom-2.png",
+          "span": [
+            103.49999999999999,
+            77.62499999999999
+          ],
+          "pixelSha256": "b8167e2fc0b4432f1ddf48b54c94245f88428eef78da2e6faff0d774411f6b1e"
+        }
+      ]
+    },
+    {
+      "name": "motif-pavilion",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 215,
+      "pointCount": 918,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-pavilion-zoom-1.png",
+          "span": [
+            209.759992980957,
+            157.31999473571776
+          ],
+          "pixelSha256": "c5d375ce0ea7aa0f97d8e1ea23cd14536d7f582df86f4ed5c97ff966ff09f761"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-pavilion-zoom-2.png",
+          "span": [
+            104.8799964904785,
+            78.65999736785888
+          ],
+          "pixelSha256": "cef6a3a39ac5f869d81d0f4c1da1f1867505b8c9c4eb3bc14592e51c620492c8"
+        }
+      ]
+    },
+    {
+      "name": "motif-house",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 93,
+      "pointCount": 813,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-house-zoom-1.png",
+          "span": [
+            88.62667134602863,
+            66.47000350952148
+          ],
+          "pixelSha256": "fb0fe10ce0c1dba05fb9e270c33550bcf0409b57022f9569877ec754fd6790fa"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-house-zoom-2.png",
+          "span": [
+            44.313335673014315,
+            33.23500175476074
+          ],
+          "pixelSha256": "1a0321a859df6929c3e05106c5fa13fc15d01c5705a9e18e81d49bbdfef246e3"
+        }
+      ]
+    },
+    {
+      "name": "motif-slatted-house",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 17,
+      "pointCount": 205,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-slatted-house-zoom-1.png",
+          "span": [
+            69,
+            51.75
+          ],
+          "pixelSha256": "2152d8071f9e28c3fb9d1ed7ee8766974d2e472cbe9d60268b68bf14ed3b9c3e"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-slatted-house-zoom-2.png",
+          "span": [
+            34.5,
+            25.875
+          ],
+          "pixelSha256": "5df907432fbc9dae9a0d1672f016cce4817504976b70c502ac21c62905b613e2"
+        }
+      ]
+    },
+    {
+      "name": "motif-lattice-house",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 41,
+      "pointCount": 834,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-lattice-house-zoom-1.png",
+          "span": [
+            69,
+            51.75
+          ],
+          "pixelSha256": "09b47465ad9b2aff962908e44a37312276a24cb5b738894e8f223aac441e8030"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-lattice-house-zoom-2.png",
+          "span": [
+            34.5,
+            25.875
+          ],
+          "pixelSha256": "1df4c7f40512e7d95bf9e88deff2de8f0e4ee07182d379d2c6835b5d035d3a69"
+        }
+      ]
+    },
+    {
+      "name": "motif-pagoda",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 238,
+      "pointCount": 2142,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-pagoda-zoom-1.png",
+          "span": [
+            180.62667134602864,
+            135.4700035095215
+          ],
+          "pixelSha256": "f9c23b8b4c53310d6951401f192188cbc1e9b4cf72e04ff71f7ed4c3125eee3b"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-pagoda-zoom-2.png",
+          "span": [
+            90.31333567301432,
+            67.73500175476075
+          ],
+          "pixelSha256": "9bc7760c89afc0213911d7412653e55c1d209c8c7b720ec0db9e76458416fbb7"
+        }
+      ]
+    },
+    {
+      "name": "motif-open-tower",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 78,
+      "pointCount": 614,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-open-tower-zoom-1.png",
+          "span": [
+            77.89333801269531,
+            58.420003509521486
+          ],
+          "pixelSha256": "270a20352a1e1fdaab456357cfacea7bdbf8192d82c907e84e524f834e688f30"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-open-tower-zoom-2.png",
+          "span": [
+            38.946669006347655,
+            29.210001754760743
+          ],
+          "pixelSha256": "a4794ba2de437c4cbe288fa19100231a732d56d86f510f345437ac4e35e21ba4"
+        }
+      ]
+    },
+    {
+      "name": "motif-standing-person",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 15,
+      "pointCount": 654,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-standing-person-zoom-1.png",
+          "span": [
+            74.06000467936198,
+            55.545003509521486
+          ],
+          "pixelSha256": "2b4fd6a441bcbf1be4f1a1f57793ece1e8290931d143cc18683776250552a996"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-standing-person-zoom-2.png",
+          "span": [
+            37.03000233968099,
+            27.772501754760743
+          ],
+          "pixelSha256": "9df91025b90d8b2550349e233a0a66aa76252665ec8b81e2b2d057cc379f6020"
+        }
+      ]
+    },
+    {
+      "name": "motif-boat-person",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 15,
+      "pointCount": 659,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-boat-person-zoom-1.png",
+          "span": [
+            84.06498947143554,
+            63.04874210357665
+          ],
+          "pixelSha256": "cc5180a0268e31d5e4f510fd37f11d44b1fd4f6c75198b6730adb0b3c94773df"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-boat-person-zoom-2.png",
+          "span": [
+            42.03249473571777,
+            31.524371051788325
+          ],
+          "pixelSha256": "d12714eafcd3e682a415044d36e7f5c8beb96753776348a5d0be16ae6d5429a5"
+        }
+      ]
+    },
+    {
+      "name": "motif-half-scale-boat",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 17,
+      "pointCount": 802,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-half-scale-boat-zoom-1.png",
+          "span": [
+            95.6799964904785,
+            71.75999736785887
+          ],
+          "pixelSha256": "6d7361435c9de91e529871118ba0c7b2fe9ac8bb1c1a8f9fb7e4439df77d92f5"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-half-scale-boat-zoom-2.png",
+          "span": [
+            47.83999824523925,
+            35.879998683929436
+          ],
+          "pixelSha256": "6223c365146a76d6db5f9e866ab9808ac69a7806d7552c476a0626f8c932233c"
+        }
+      ]
+    },
+    {
+      "name": "motif-mirrored-boat",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 17,
+      "pointCount": 802,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-mirrored-boat-zoom-1.png",
+          "span": [
+            187.56499824523925,
+            140.67374868392943
+          ],
+          "pixelSha256": "3e5b348699d8ea0cadd3d2ca1eb288498a39a2d6d616d97cc027dce316d7d20d"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-mirrored-boat-zoom-2.png",
+          "span": [
+            93.78249912261963,
+            70.33687434196472
+          ],
+          "pixelSha256": "ccd9f35c5ba08bcaea1b878e68d46f978025bc5201baee9e1c94851b28dfa38c"
+        }
+      ]
+    },
+    {
+      "name": "motif-transmission-tower",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 50,
+      "pointCount": 590,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-transmission-tower-zoom-1.png",
+          "span": [
+            153.94666900634763,
+            115.46000175476073
+          ],
+          "pixelSha256": "a2cd76bb4fcead53d60de51f5798f3c7e14d9a1835acfef7a1ba28b1405d9996"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-transmission-tower-zoom-2.png",
+          "span": [
+            76.97333450317382,
+            57.73000087738036
+          ],
+          "pixelSha256": "1a2632584ff1f5e61cec901465a5c722011c38df32b9bb2745be63497fc9a888"
+        }
+      ]
+    },
+    {
+      "name": "motif-water",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 9,
+      "pointCount": 2289,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "motif-water-zoom-1.png",
+          "span": [
+            918.2750350952148,
+            688.706276321411
+          ],
+          "pixelSha256": "770e74ed9f3a92fc3b0f281e59e01adb1cc41db028033f0ec1967d673debccd3"
+        },
+        {
+          "zoom": 2,
+          "filename": "motif-water-zoom-2.png",
+          "span": [
+            459.1375175476074,
+            344.3531381607055
+          ],
+          "pixelSha256": "a70f9e8a6aac4492738cfe1044c78aca58ded30efd200f36044b00d98eb364b8"
+        }
+      ]
+    },
+    {
+      "name": "rock",
+      "category": "motif",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 1,
+      "commandCount": 26,
+      "pointCount": 602,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "rock-zoom-1.png",
+          "span": [
+            208.14999999999998,
+            156.11249999999998
+          ],
+          "pixelSha256": "4321b01495234a240c228cc69dc24986eec93cd5d34df8bca9aaa0c491020053"
+        },
+        {
+          "zoom": 2,
+          "filename": "rock-zoom-2.png",
+          "span": [
+            104.07499999999999,
+            78.05624999999999
+          ],
+          "pixelSha256": "ec888010e1fad917ee404f6c5a1ac601d3ae6e1123fcbe4a5dd0578fdbed8e9b"
+        }
+      ]
+    },
+    {
+      "name": "dense-overlap",
+      "category": "occlusion",
+      "source": "native production constructors from fixed descriptors",
+      "descriptorCount": 9,
+      "commandCount": 1960,
+      "pointCount": 44547,
+      "renders": [
+        {
+          "zoom": 1,
+          "filename": "dense-overlap-zoom-1.png",
+          "span": [
+            685.7450210571288,
+            514.3087657928465
+          ],
+          "pixelSha256": "4075a3f4cb63149c51fd4774bbd524666bc753ef32a45bb3e08a2d96a4846c24"
+        },
+        {
+          "zoom": 2,
+          "filename": "dense-overlap-zoom-2.png",
+          "span": [
+            342.8725105285644,
+            257.1543828964233
+          ],
+          "pixelSha256": "39b6ee44478c5d5ada500f8df1a9ad50efa7cfffc61f587e28f33af6b0139494"
+        }
+      ]
+    }
+  ],
+  "contactSheet": {
+    "filename": "contact-sheet.png",
+    "columns": 4,
+    "order": [
+      "tree-1-sparse-contours",
+      "tree-2-leaf-cluster",
+      "tree-3-dense-canopy",
+      "tree-4-spreading-canopy",
+      "tree-5-tiered-canopy",
+      "tree-6-forked-bare-tree",
+      "tree-7-faceted-canopy",
+      "tree-8-leaning-line-tree",
+      "island-boulders",
+      "island-tiered-grove",
+      "island-spreading-trees",
+      "island-forked-trees",
+      "island-faceted-grove",
+      "motif-thatch",
+      "motif-pavilion",
+      "motif-house",
+      "motif-slatted-house",
+      "motif-lattice-house",
+      "motif-pagoda",
+      "motif-open-tower",
+      "motif-standing-person",
+      "motif-boat-person",
+      "motif-half-scale-boat",
+      "motif-mirrored-boat",
+      "motif-transmission-tower",
+      "motif-water",
+      "rock",
+      "dense-overlap"
+    ]
+  },
+  "sourceHashes": {
+    "src/shaders/allocate-children.wgsl": "5154504d9a627fa70fc6b53fbb68b2e5484fa70f98029e5b3c987ea0bb5deb43",
+    "src/shaders/allocate-parents.wgsl": "556536b345d1c5de525b062578b05704987ccc639459f6af01dd8722a44c20ab",
+    "src/shaders/brushes.wgsl": "8d88a0288d863bcf153358f347723450a6bd7a0c9459a8e3308dca5514cfe7d4",
+    "src/shaders/capacity.wgsl": "742f27f94efb354165b5d7f23cad933c2db05d2d1ada4f9fc7b8435e33d92b7a",
+    "src/shaders/children.wgsl": "747722549ff84af59214e9fe775f0cc19ceeff5731faeeab0d61e3145e458a94",
+    "src/shaders/commands.wgsl": "dbf5e2ab7e0e80f05574cb66ba5823d0f5a87445766f8e630b8aba0bb76e780f",
+    "src/shaders/compact-brushes.wgsl": "a136a6be256bbb0eca0ac50dbcbe1b1686bb16a04084cc05e84f4b343b11922e",
+    "src/shaders/construct-boats.wgsl": "8b70430d3bc7bc62f16f0eeb859778a14790280048157af769fe377b7c553915",
+    "src/shaders/construct-buildings.wgsl": "a4491938db5dbda33b435acfa0132604d53e092deec30d0650317d4c0b5651d3",
+    "src/shaders/construct-huts.wgsl": "08b1e361af28b162759f8e71a7a3934ef3b39d29dcdb588f9d4b5a4e2de746c5",
+    "src/shaders/construct-rocks.wgsl": "be6df53bf605a16ecb8e7fbdb12e44d2691def4c98460789ca4575b862147857",
+    "src/shaders/construct-terrain.wgsl": "751230733762b0e4b0a7495414dae6be19e78e70dc4eb470632f74d8d35957da",
+    "src/shaders/construct-towers.wgsl": "444a71e936ba9f68795ea423f15b8187f619cda561fb94f4387e1bfe06d90c16",
+    "src/shaders/construct-trees.wgsl": "9004ee99c232970fb122f0d841627c5a2834c153f120cce03905b9e55ca1c3e4",
+    "src/shaders/construct-water.wgsl": "1bdd52656728621279124f16b2a930cd21e1a619f29f7673cc29c22bc1d68223",
+    "src/shaders/construction.wgsl": "9545e455300bf32f1e4bef3febe719b58af6ea88908e0f4f9e35f33e910f554d",
+    "src/shaders/count-brushes.wgsl": "f3d90f1d3ba1dba92264d72101e9c6ecea9cd93b64041eda7636890913b160bc",
+    "src/shaders/glyphs.wgsl": "87bebea527848582a23d6bed36b60dd61827497cf6c36ecbc8f3026805c19b40",
+    "src/shaders/initialize.wgsl": "23312577d9aacfa7ae4ff4c97dbefaffd7ea85320484d7b8f706b2449332a20d",
+    "src/shaders/island-decorations.wgsl": "8f19002398a982b51e8b7672335045a55cd6a0e555359d57f7d446bf6a72d649",
+    "src/shaders/leaf-shape.wgsl": "6d818171d3cd15e67624db5f4d28bb5b0258cb7f134196650e3e14268d74bbf8",
+    "src/shaders/motifs.wgsl": "faf36895b63afac1a273bd491e472aa497a87781081ff07f0932bb98d2c35360",
+    "src/shaders/noise.wgsl": "684a41626047a38623ffb58f7eb7d01ee8587e69c6e9f54842a1f1d0b892fe45",
+    "src/shaders/paper.wgsl": "272281b13c7032cb4259de82421c35406ec7cf5959da702fe78974c73eafae20",
+    "src/shaders/paths.wgsl": "7d2358edf1060451c7cef93a9f8257d0f124dbe0e4f69a7ee8a5da7690ba7647",
+    "src/shaders/plan.wgsl": "d61d987c161760c92ca39a22367c72fb2b0f38cbbbcff389c15a3953b729bf53",
+    "src/shaders/random.wgsl": "c95223d0ce6659add1de76a9ff56f6df1e09cfa9cab20af2a2a0bea45a04e6cc",
+    "src/shaders/rock.wgsl": "fe313f5db66fcda9f5fc245c94df37b20311ab3d6b395d8f2fc57d9a41275dfb",
+    "src/shaders/terrain.wgsl": "d117d4404ae6edff5bdaab76b36151042bbb984f627fcb989d2b1e2e8e5eabdf",
+    "src/shaders/trees.wgsl": "66882a25ea28cd8c3595f22c224511d032bb2d021a1ad61307a15d27e1bb9153",
+    "tests/gpu/corpus-figures.wgsl": "de4e8d361c00b12ac1e063e77254c896026f8767e872126f2e94c4429c0d90ce"
+  },
+  "sourceHashRecording": "Recorded after this run from the unchanged shader sources used for native compilation."
+}

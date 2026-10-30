@@ -23,17 +23,25 @@ const owners = new WeakSet<LandscapeCanvas>();
 const transferred = new WeakSet<LandscapeCanvas>();
 const freshCanvasMessage = "This canvas has already been transferred to a landscape worker. Create a fresh canvas for a new renderer.";
 
+/** Main-thread settings, never serialized to the rendering worker. */
+export interface LandscapeRuntimeOptions {
+  /** Return a fresh module worker emitted by the application's bundler. */
+  workerFactory?: () => Worker;
+  /** Cancels worker setup and first-frame construction; detached after creation. */
+  signal?: AbortSignal;
+}
+
 /** Query worker WebGPU support without claiming a canvas or requesting a device. SSR safe. */
-export async function isWebGPUSupported(): Promise<boolean> {
+export async function isWebGPUSupported(runtime: LandscapeRuntimeOptions = {}): Promise<boolean> {
   try {
-    const worker = await connectWorker();
+    const worker = await connectWorker(runtime.workerFactory, runtime.signal);
     worker.terminate();
     return true;
   } catch { return false; }
 }
 
 /** Transfer a fresh canvas to its worker and wait for the first GPU frame. */
-export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<LandscapeOptions> = {}): Promise<LandscapeRenderer> {
+export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<LandscapeOptions> = {}, runtime: LandscapeRuntimeOptions = {}): Promise<LandscapeRenderer> {
   if (!canvas || typeof canvas.getContext !== "function") {
     throw new TypeError("createLandscape requires an unused HTMLCanvasElement or OffscreenCanvas.");
   }
@@ -51,8 +59,12 @@ export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<La
   // Claim before awaiting support so concurrent initializations cannot share a canvas.
   owners.add(canvas);
   let worker: Worker;
-  try { worker = await connectWorker(); }
+  try { worker = await connectWorker(runtime.workerFactory, runtime.signal); }
   catch (error) { owners.delete(canvas); throw error; }
+  if (runtime.signal?.aborted) {
+    worker.terminate(); owners.delete(canvas);
+    throw new DOMException("Landscape initialization was aborted.", "AbortError");
+  }
 
   let state: LandscapeState = Object.freeze({ status: "ready", error: null });
   const listeners = new Set<(state: LandscapeState) => void>();
@@ -90,6 +102,7 @@ export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<La
     worker.removeEventListener("message", onMessage);
     worker.removeEventListener("error", onError);
     worker.removeEventListener("messageerror", onMessageError);
+    runtime.signal?.removeEventListener("abort", onAbort);
     worker.terminate();
     owners.delete(canvas);
   }
@@ -129,6 +142,7 @@ export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<La
     if (data.type === "disposed") { stop(); return; }
     if (data.type === "ready") {
       clearTimeout(initializationTimer);
+      runtime.signal?.removeEventListener("abort", onAbort);
       initialized.resolve();
       return;
     }
@@ -150,9 +164,11 @@ export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<La
     fail(new Error(`Landscape worker failed: ${event.message || "worker execution stopped"}. Create a fresh canvas to restart.`));
   }
   function onMessageError(): void { fail(new Error("The landscape worker could not decode a message.")); }
+  function onAbort(): void { fail(new DOMException("Landscape initialization was aborted.", "AbortError")); }
   worker.addEventListener("message", onMessage);
   worker.addEventListener("error", onError);
   worker.addEventListener("messageerror", onMessageError);
+  runtime.signal?.addEventListener("abort", onAbort, { once: true });
 
   try {
     const offscreen = "transferControlToOffscreen" in canvas ? canvas.transferControlToOffscreen() : canvas;
@@ -176,12 +192,19 @@ export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<La
     const candidate = resolveOptions(patch, options);
     const result = deferred<void>();
     options = candidate;
+    // A capture already in the queue is an exact barrier: finish its preceding
+    // painting. Otherwise move superseded callers onto the replacement frame.
+    const superseded = active?.type === "render" && active.options.presentation === "incremental"
+      && !queue.some(job => job.type === "capture") ? active : undefined;
+    const waiters = superseded ? superseded.waiters.splice(0) : [];
+    waiters.push(result);
     const previous = queue[queue.length - 1];
     if (previous?.type === "render") {
       previous.options = candidate;
       previous.revision = ++revision;
-      previous.waiters.push(result);
-    } else queue.push({ type: "render", revision: ++revision, options: candidate, waiters: [result] });
+      previous.waiters.push(...waiters);
+    } else queue.push({ type: "render", revision: ++revision, options: candidate, waiters });
+    if (superseded) post({ type: "cancel", revision: superseded.revision });
     schedule();
     return result.promise;
   }

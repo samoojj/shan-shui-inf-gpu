@@ -243,13 +243,6 @@ fn irregularBranch(
   return BranchSides(first, second);
 }
 
-fn deferBark(writer: ptr<function, Writer>, queue: ptr<function, TreeQueue>, sides: BranchSides) {
-  let record = appendTreeRecord(writer, queue, 4u);
-  if (record.count != 4u) { return; }
-  storeTreePath(record, 0u, sides.first);
-  storeTreePath(record, 2u, sides.second);
-}
-
 fn deferTwig(writer: ptr<function, Writer>, queue: ptr<function, TreeQueue>, request: TwigRequest) {
   let record = appendTreeRecord(writer, queue, 5u);
   if (record.count != 5u) { return; }
@@ -329,39 +322,43 @@ fn leafyTwig(writer: ptr<function, Writer>, request: TwigRequest) {
 }
 
 fn deferBarkRun(
-  writer: ptr<function, Writer>, queue: ptr<function, TreeQueue>, path: Path, runIndex: u32,
+  writer: ptr<function, Writer>, queue: ptr<function, TreeQueue>, path: Path, runIndex: u32, sourceIndex: u32,
 ) {
   if (path.count == 0u) { return; }
-  let record = appendTreeRecord(writer, queue, 3u);
-  if (record.count != 3u) { return; }
+  let record = appendTreeRecord(writer, queue, 4u);
+  if (record.count != 4u) { return; }
   storeTreePath(record, 0u, path);
   storeTreeIndex(record, 2u, runIndex);
+  storeTreeIndex(record, 3u, sourceIndex);
 }
 
-fn barkBoundaryFragments(writer: ptr<function, Writer>, perimeter: Path) {
+fn barkBoundaryFragments(writer: ptr<function, Writer>, perimeter: Path, sides: BranchSides, mutateEndpoint: bool) {
   let retained = reservePath(writer, perimeter.count);
   if (retained.count != perimeter.count) { return; }
   var runs = treeQueue();
   var used = 0u;
   var start = 0u;
   var runIndex = 0u;
+  var sourceIndex = 0u;
   // Complete the split decisions before the displacement and stroke pass.
   for (var index = 0u; index < perimeter.count; index++) {
     if (random(writer) < 0.5) {
-      deferBarkRun(writer, &runs, Path(retained.offset + start, used - start), runIndex);
+      deferBarkRun(writer, &runs, Path(retained.offset + start, used - start), runIndex, sourceIndex);
       start = used;
       runIndex += 1u;
     } else {
       setPoint(retained, used, point(perimeter, index));
+      sourceIndex = index;
       used += 1u;
     }
   }
-  deferBarkRun(writer, &runs, Path(retained.offset + start, used - start), runIndex);
+  deferBarkRun(writer, &runs, Path(retained.offset + start, used - start), runIndex, sourceIndex);
   var recordOffset = runs.first;
   for (var index = 0u; index < runs.count; index++) {
     if ((*writer).overflow != 0u) { return; }
-    let record = Path(recordOffset + 1u, 3u);
+    let record = Path(recordOffset + 1u, 4u);
     let fragment = subdivide(writer, loadTreePath(record, 0u), 4u);
+    if ((*writer).overflow != 0u) { return; }
     let noiseSlice = f32(loadTreeIndex(record, 2u));
     for (var sample = 0u; sample < fragment.count; sample++) {
       let jitterX = (noise(vec3f(noiseSlice, f32(sample) * 0.1, 1.0)) - 0.5)
@@ -370,12 +367,23 @@ fn barkBoundaryFragments(writer: ptr<function, Writer>, perimeter: Path) {
         * (15.0 + 5.0 * gaussian(writer));
       setPoint(fragment, sample, point(fragment, sample) + vec2f(jitterX, jitterY));
     }
+    // The source div() retains its last input point by reference. Bark jitter
+    // consequently moves that branch control before later branches attach.
+    let lastSource = loadTreeIndex(record, 3u);
+    let endpoint = point(fragment, fragment.count - 1u);
+    if (mutateEndpoint) {
+      if (lastSource < sides.first.count) {
+        setPoint(sides.first, lastSource, endpoint);
+      } else {
+        setPoint(sides.second, sides.second.count - 1u - (lastSource - sides.first.count), endpoint);
+      }
+    }
     stroke(writer, fragment, ink(0.7), 1.5, 0u, 0.5, 0.0);
     recordOffset = nextTreeRecord(recordOffset);
   }
 }
 
-fn branchBark(writer: ptr<function, Writer>, sides: BranchSides) {
+fn branchBark(writer: ptr<function, Writer>, sides: BranchSides, mutateEndpoint: bool) {
   let count = min(sides.first.count, sides.second.count);
   for (var index = 2u; index + 1u < count; index++) {
     if ((*writer).overflow != 0u) { return; }
@@ -406,10 +414,10 @@ fn branchBark(writer: ptr<function, Writer>, sides: BranchSides) {
       }
     }
   }
-  barkBoundaryFragments(writer, branchPerimeter(writer, sides));
+  barkBoundaryFragments(writer, branchPerimeter(writer, sides), sides, mutateEndpoint);
 }
 
-fn paintTreeTrunk(writer: ptr<function, Writer>, perimeter: Path, color: vec4f, trim: bool, opacity: f32) {
+fn paintTreeTrunk(writer: ptr<function, Writer>, perimeter: Path, color: vec4f, trim: bool, opacity: f32, start: vec2u) {
   if ((*writer).overflow != 0u) { return; }
   polygon(writer, perimeter, Paint(white(), color, 0.0));
   var outline = perimeter;
@@ -418,17 +426,30 @@ fn paintTreeTrunk(writer: ptr<function, Writer>, perimeter: Path, color: vec4f, 
   }
   let outlineColor = treeAlpha(ink(opacity), random(writer) * 0.1, 1000.0);
   stroke(writer, outline, outlineColor, 2.5, 3u, 0.9, 0.0);
+  if ((*writer).overflow != 0u) { return; }
+  // Bark must construct before branch attachments because its endpoint alias
+  // affects geometry, but the mask/outline must still paint before all bark.
+  let end = (*writer).commandCount;
+  let mask = constructionJobs[(*writer).commandBase + end - 2u];
+  let contour = constructionJobs[(*writer).commandBase + end - 1u];
+  var cursor = end - 2u;
+  while (cursor > start.x) {
+    cursor--;
+    constructionJobs[(*writer).commandBase + cursor + 2u] = constructionJobs[(*writer).commandBase + cursor];
+  }
+  constructionJobs[(*writer).commandBase + start.x] = mask;
+  constructionJobs[(*writer).commandBase + start.x + 1u] = contour;
+  var offset = start.y;
+  for (var command = start.x; command < end; command++) {
+    var brush = constructionJobs[(*writer).commandBase + command];
+    brush.pointOffset = offset;
+    constructionJobs[(*writer).commandBase + command] = brush;
+    offset += brush.pointCount;
+  }
 }
 
-fn paintTreeDetails(writer: ptr<function, Writer>, bark: TreeQueue, twigs: TreeQueue) {
-  var recordOffset = bark.first;
-  for (var index = 0u; index < bark.count; index++) {
-    if ((*writer).overflow != 0u) { return; }
-    let record = Path(recordOffset + 1u, 4u);
-    branchBark(writer, BranchSides(loadTreePath(record, 0u), loadTreePath(record, 2u)));
-    recordOffset = nextTreeRecord(recordOffset);
-  }
-  recordOffset = twigs.first;
+fn paintTreeDetails(writer: ptr<function, Writer>, twigs: TreeQueue) {
+  var recordOffset = twigs.first;
   for (var index = 0u; index < twigs.count; index++) {
     if ((*writer).overflow != 0u) { return; }
     leafyTwig(writer, readTwig(Path(recordOffset + 1u, 5u)));
@@ -500,11 +521,11 @@ fn denseCanopyTree(writer: ptr<function, Writer>, origin: vec2f, height: f32, wi
 }
 
 fn spreadingCanopyTree(writer: ptr<function, Writer>, origin: vec2f, height: f32, width: f32, color: vec4f) {
-  var bark = treeQueue();
+  let start = vec2u((*writer).commandCount, (*writer).pointCount);
   var twigs = treeQueue();
   var outline = treePathChain();
   let trunk = irregularBranch(writer, origin, height, width, -TREE_PI * 0.5, TREE_PI * 0.2, 10.0);
-  deferBark(writer, &bark, trunk);
+  branchBark(writer, trunk, true);
   let perimeter = branchPerimeter(writer, trunk);
   for (var index = 0u; index < perimeter.count; index++) {
     if ((*writer).overflow != 0u) { return; }
@@ -523,7 +544,9 @@ fn spreadingCanopyTree(writer: ptr<function, Writer>, origin: vec2f, height: f32
     if ((*writer).overflow != 0u) { return; }
     let sides = BranchSides(Path(branch.first.offset + 1u, branch.first.count - 1u),
       Path(branch.second.offset + 1u, branch.second.count - 1u));
-    deferBark(writer, &bark, sides);
+    // Upstream passes translated copies to child barkify(), isolating its
+    // endpoint alias from the child outline used for the tree silhouette.
+    branchBark(writer, sides, false);
     for (var sample = 0u; sample < sides.first.count; sample++) {
       let sprout = random(writer) < 0.2;
       if (sprout || sample + 1u == sides.first.count) {
@@ -534,16 +557,16 @@ fn spreadingCanopyTree(writer: ptr<function, Writer>, origin: vec2f, height: f32
     }
     appendTreeSpan(writer, &outline, branchPerimeter(writer, sides));
   }
-  paintTreeTrunk(writer, flattenTreeChain(writer, outline), color, true, 0.4);
-  paintTreeDetails(writer, bark, twigs);
+  paintTreeTrunk(writer, flattenTreeChain(writer, outline), color, true, 0.4, start);
+  paintTreeDetails(writer, twigs);
 }
 
 fn tieredCanopyTree(writer: ptr<function, Writer>, origin: vec2f, height: f32, width: f32, color: vec4f) {
-  var bark = treeQueue();
+  let start = vec2u((*writer).commandCount, (*writer).pointCount);
   var twigs = treeQueue();
   var outline = treePathChain();
   let trunk = irregularBranch(writer, origin, height, width, -TREE_PI * 0.5, 0.0, 10.0);
-  deferBark(writer, &bark, trunk);
+  branchBark(writer, trunk, true);
   let perimeter = branchPerimeter(writer, trunk);
   for (var index = 0u; index < perimeter.count; index++) {
     if ((*writer).overflow != 0u) { return; }
@@ -575,26 +598,26 @@ fn tieredCanopyTree(writer: ptr<function, Writer>, origin: vec2f, height: f32, w
     }
     appendTreeSpan(writer, &outline, branchPerimeter(writer, sides));
   }
-  paintTreeTrunk(writer, flattenTreeChain(writer, outline), color, true, 0.4);
-  paintTreeDetails(writer, bark, twigs);
+  paintTreeTrunk(writer, flattenTreeChain(writer, outline), color, true, 0.4, start);
+  paintTreeDetails(writer, twigs);
 }
 
 fn forkFrame(
-  writer: ptr<function, Writer>, bark: ptr<function, TreeQueue>, origin: vec2f,
+  writer: ptr<function, Writer>, origin: vec2f,
   height: f32, width: f32, angle: f32, bend: f32, depth: u32,
 ) -> ForkFrame {
   let sides = irregularBranch(writer, origin, height, width, angle, bend, height / 20.0);
-  deferBark(writer, bark, sides);
+  branchBark(writer, sides, true);
   return ForkFrame(branchPerimeter(writer, sides), treePathChain(), height, width, angle, depth, 0u, 0.0);
 }
 
 fn forkedTreeOutline(
   writer: ptr<function, Writer>, origin: vec2f, height: f32, width: f32,
-  bark: ptr<function, TreeQueue>, twigs: ptr<function, TreeQueue>,
+  twigs: ptr<function, TreeQueue>,
 ) -> Path {
   var stack: array<ForkFrame, 4>;
   var stackIndex = 0u;
-  stack[0] = forkFrame(writer, bark, origin, height, width, -TREE_PI * 0.5, 0.0, 3u);
+  stack[0] = forkFrame(writer, origin, height, width, -TREE_PI * 0.5, 0.0, 3u);
   loop {
     if ((*writer).overflow != 0u) { return Path(0u, 0u); }
     var frame = stack[stackIndex];
@@ -637,17 +660,17 @@ fn forkedTreeOutline(
     frame.childAngle = angle;
     stack[stackIndex] = frame;
     stackIndex += 1u;
-    stack[stackIndex] = forkFrame(writer, bark, point(frame.perimeter, index), childHeight,
+    stack[stackIndex] = forkFrame(writer, point(frame.perimeter, index), childHeight,
       frame.width * 0.6, frame.angle + angle, 0.55, frame.depth - 1u);
   }
 }
 
 fn forkedBareTree(writer: ptr<function, Writer>, origin: vec2f, height: f32, width: f32, color: vec4f) {
-  var bark = treeQueue();
+  let start = vec2u((*writer).commandCount, (*writer).pointCount);
   var twigs = treeQueue();
-  let outline = forkedTreeOutline(writer, origin, height, width, &bark, &twigs);
-  paintTreeTrunk(writer, outline, color, true, 0.4);
-  paintTreeDetails(writer, bark, twigs);
+  let outline = forkedTreeOutline(writer, origin, height, width, &twigs);
+  paintTreeTrunk(writer, outline, color, true, 0.4, start);
+  paintTreeDetails(writer, twigs);
 }
 
 fn facetedCanopyTree(writer: ptr<function, Writer>, origin: vec2f, height: f32, width: f32, bend: f32) {
@@ -729,10 +752,11 @@ fn recursiveLineBranch(writer: ptr<function, Writer>, origin: vec2f, angle: f32,
 }
 
 fn leaningLineTree(writer: ptr<function, Writer>, origin: vec2f, height: f32, width: f32, color: vec4f) {
+  let start = vec2u((*writer).commandCount, (*writer).pointCount);
   let lean = uniform(writer, -1.0, 1.0) * TREE_PI * 0.2;
   let trunk = irregularBranch(writer, origin, height, width, -TREE_PI * 0.5 + lean, TREE_PI * 0.2, height / 20.0);
   let perimeter = branchPerimeter(writer, trunk);
-  paintTreeTrunk(writer, perimeter, color, false, 0.6);
+  paintTreeTrunk(writer, perimeter, color, false, 0.6, start);
   for (var index = 0u; index < perimeter.count; index++) {
     if ((*writer).overflow != 0u) { return; }
     if (random(writer) < 0.2) {

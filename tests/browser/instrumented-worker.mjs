@@ -18,7 +18,9 @@ const identify = value => {
 function wrap(prototype, name, replacement) {
   prototype[name] = replacement(prototype[name]);
 }
-function metrics() { return { ...gpu, devices: devices.map(identify), workerNow: performance.now(), timeOrigin: performance.timeOrigin }; }
+function metrics() { return { ...gpu, phases: performance.getEntriesByType('measure')
+  .filter(entry => entry.name.startsWith('landscape:')).map(({name, startTime, duration}) => ({name, startTime, duration})),
+  devices: devices.map(identify), workerNow: performance.now(), timeOrigin: performance.timeOrigin }; }
 function publish() { nativePost({ type: 'test:metrics', metrics: metrics() }); }
 self.postMessage = (message, transfer) => {
   if (!message.type.startsWith('test:')) {
@@ -35,7 +37,8 @@ wrap(GPUAdapter.prototype, 'requestDevice', original => async function (...args)
   if (configuration.deviceFailure) throw new Error('Deliberate device allocation failure');
   const device = await original.apply(this, args);
   devices.push(device);
-  gpu.adapterInfo.push({ vendor: this.info.vendor, architecture: this.info.architecture, description: this.info.description });
+  gpu.adapterInfo.push({ vendor: this.info.vendor, architecture: this.info.architecture, description: this.info.description,
+    isFallbackAdapter: this.info.isFallbackAdapter });
   device.addEventListener('uncapturederror', event => gpu.errors.push(event.error.message));
   return device;
 });

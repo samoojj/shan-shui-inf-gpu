@@ -8,6 +8,9 @@ landscape implementation executes in production or acceptance tests.
   pinned upstream and original capture revisions.
 - `construction.json`: tree geometry and island placement, with source hashes
   and capture provenance. See [construction.md](construction.md).
+- `controlled-trees.json`: complete ordered historical CPU output for tree styles
+  4–6 and 8 under constant random input, closing the geometry-proof gap left by
+  changed random-consumption order. Explicit recapture tooling is development-only.
 - `gpu-terrain.json`: nine fixed-parameter mountain, island, distant-ridge and
   rock cases, including ordered brushes and queued child descriptions.
 - `gpu-motifs.json`: thirteen fixed-parameter architectural, figure, boat and

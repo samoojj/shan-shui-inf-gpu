@@ -13,7 +13,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./worker": "./dist/runtime/worker.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -36,7 +37,10 @@
     "demo": "npm run build && node scripts/serve.mjs",
     "prepack": "npm run build",
     "compare:reference": "npm run build && node scripts/compare-reference.mjs",
-    "test:gpu": "node tests/gpu-primitives.mjs"
+    "test:gpu": "node tests/gpu-primitives.mjs",
+    "test:consumer": "npm run build && node tests/consumer.mjs",
+    "benchmark": "npm run build && node scripts/benchmark.mjs",
+    "test:visual": "node scripts/visual-corpus.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

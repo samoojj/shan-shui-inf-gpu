@@ -9,11 +9,16 @@ export interface LandscapeOptions {
   cameraY: number;
   /** Original viewer scale is 1.142 screen pixels per drawing unit. */
   zoom: number;
+  /** Reveal ordered brush commands over multiple frames, or present the complete image. */
+  presentation: "complete" | "incremental";
+  /** Maximum brush commands painted per incremental frame. */
+  commandsPerFrame: number;
 }
 
 export const DEFAULT_OPTIONS: Readonly<LandscapeOptions> = Object.freeze({
   seed: '1234', width: 1200, height: 700, pixelRatio: 1,
   cameraX: 0, cameraY: 0, zoom: 1.142,
+  presentation: 'complete', commandsPerFrame: 256,
 });
 
 function numberInRange(name: string, value: unknown, min: number, max: number, integer = false): asserts value is number {
@@ -34,6 +39,8 @@ export function resolveOptions(patch: Partial<LandscapeOptions>, previous: Reado
   numberInRange('cameraX', next.cameraX, -8192, 8192);
   numberInRange('cameraY', next.cameraY, -8192, 8192);
   numberInRange('zoom', next.zoom, .25, 4);
+  if (next.presentation !== 'complete' && next.presentation !== 'incremental') throw new TypeError('presentation must be complete or incremental.');
+  numberInRange('commandsPerFrame', next.commandsPerFrame, 1, 1_000_000, true);
   if (next.width / next.zoom > 8192) throw new RangeError('width / zoom must not exceed 8192 drawing units. Increase zoom or reduce width.');
   return next;
 }

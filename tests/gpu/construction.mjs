@@ -4,6 +4,7 @@ import { compute, storage } from 'vgpu/node';
 import { resolveShader } from '@vgpu/wgsl/runtime';
 import { prepareShader } from '@vgpu/wgsl/prepare';
 import { readFixture } from '../helpers/fixtures.mjs';
+import { checkControlledTrees } from './controlled-trees.mjs';
 
 const tolerance = .002;
 const brushBytes = 128;
@@ -340,6 +341,7 @@ export async function checkConstruction(gpu) {
   const fixture = await readFixture('construction');
   const trees = await checkTreeConstruction(gpu, fixture.trees);
   const islands = await checkIslandConstruction(gpu, fixture.islands);
+  const controlledTrees = await checkControlledTrees(gpu);
   await gpu.settled();
-  return { trees, islands };
+  return { trees, islands, controlledTrees };
 }

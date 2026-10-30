@@ -106,8 +106,11 @@ export async function createGenerator(gpu: Gpu) {
     return counts;
   }
 
+  const compilationStarted = performance.now();
   try { await Promise.all(Object.values(pipelines).map(pipeline => pipeline.compile())); }
   catch (error) { dispose(); throw error; }
+  performance.clearMeasures("landscape:construction-compile");
+  performance.measure("landscape:construction-compile", { start: compilationStarted, end: performance.now() });
 
   async function generate(options: Readonly<LandscapeOptions>): Promise<Painting> {
     if (disposed) throw new Error("Landscape generator has been disposed.");
@@ -117,6 +120,7 @@ export async function createGenerator(gpu: Gpu) {
     const chunkCount = lastChunk - firstChunk;
     const key = `${seed}:${firstChunk}:${lastChunk}`;
     if (current && currentKey === key) return current;
+    const constructionStarted = performance.now();
     if (current) { release(current.jobs); release(current.points); release(current.bounds); current = undefined; }
     const scratch: GPUBuffer[] = [];
     const temporary = (label: string, bytes: number) => {
@@ -170,6 +174,8 @@ export async function createGenerator(gpu: Gpu) {
       dispatch(pipelines.brushes, Math.ceil(commandCount / 64));
       await gpu.settled();
       current = { jobs, points, bounds, commandCount }; currentKey = key;
+      performance.clearMeasures("landscape:construction");
+      performance.measure("landscape:construction", { start: constructionStarted, end: performance.now() });
       return current;
     } finally { for (const buffer of scratch) release(buffer); }
   }

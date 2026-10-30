@@ -9,6 +9,7 @@ export type WorkerRequest =
   | { readonly type: "probe" }
   | { readonly type: "initialize"; readonly canvas: OffscreenCanvas; readonly options: LandscapeOptions }
   | { readonly type: "render" | "capture"; readonly revision: number; readonly options: LandscapeOptions }
+  | { readonly type: "cancel"; readonly revision: number }
   | { readonly type: "dispose" };
 
 export type WorkerResponse =
