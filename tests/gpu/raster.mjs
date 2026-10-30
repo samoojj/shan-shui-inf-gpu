@@ -13,6 +13,7 @@ export async function checkRaster(gpu, packDrawing, outputDirectory) {
     polygon([[110, 10], [160, 10], [160, 10], [160, 60]], 'none', 'black', 4),
     polygon([[110, 80], [160, 80], [160, 130], [110, 130], [110, 80],
       [135, 80], [185, 80], [185, 130], [135, 130], [135, 80]], 'black'),
+    polygon([[191.25, 10], [191.25, 60], [191.25, 60], [191.25, 10], [191.25, 60]], 'none', 'black', 1),
   ];
   const packed = packDrawing(drawing);
   const generated = await generatePaths(gpu, packed, new Float32Array(4096));
@@ -30,9 +31,11 @@ export async function checkRaster(gpu, packDrawing, outputDirectory) {
       first: at(20, 20), overlap: at(40, 40), whiteMask: at(70, 70), degenerate: at(50, 90),
       openDiagonal: at(135, 35), buttCap: at(108, 10), miterWithRepeatedPoint: at(161, 8),
       internalEdgeLeft: at(134, 100), internalEdgeRight: at(135, 100),
+      // One and three of the four sample columns hit this retraced vertical stroke.
+      footprintLeft: at(190, 30), footprintRight: at(191, 30), footprintOutside: at(192, 30),
     };
     const expected = { first: 128, overlap: 192, whiteMask: 255, degenerate: 255, openDiagonal: 255,
-      buttCap: 255, miterWithRepeatedPoint: 0, internalEdgeLeft: 0, internalEdgeRight: 0 };
+      buttCap: 255, miterWithRepeatedPoint: 0, internalEdgeLeft: 0, internalEdgeRight: 0, footprintLeft: 191, footprintRight: 64, footprintOutside: 255 };
     for (const [name, rgba] of Object.entries(samples)) {
       for (const channel of rgba.slice(0, 3)) assert(Math.abs(channel - expected[name]) <= 1, `${name}: ${rgba}`);
       assert.equal(rgba[3], 255, `${name}: output must stay opaque over white`);
