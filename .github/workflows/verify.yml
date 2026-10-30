@@ -17,8 +17,6 @@ jobs:
       - run: npm test
       - run: npx vgpu install-software-renderer
       - run: npm run check:shaders
-        env:
-          VGPU_ADAPTER: software
       - run: npm run test:gpu
         env:
           VGPU_ADAPTER: software

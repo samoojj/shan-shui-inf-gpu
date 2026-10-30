@@ -21,13 +21,16 @@ Use Node.js 22 or newer:
 
 ```sh
 npm install
-npm run build
+npm run demo
 ```
 
-The library API and packaged consumer work at this stage. The original SVG
-demo remains at the repository root; the GPU example and demo command join in
-the final stack PR. See [consumer integration](docs/consumer.md) for a runnable
-production bundler recipe.
+Open [localhost:4173/examples/](http://localhost:4173/examples/) in a browser that
+supports module workers, OffscreenCanvas, and WebGPU inside workers. WebGPU
+requires HTTPS in production; localhost works for development.
+
+The example supports seed selection, horizontal dragging, keyboard panning,
+zoom, reset, and PNG export. It redraws on input or resize without a continuous
+animation loop.
 
 The package has not been published to a registry. To use a local checkout:
 
@@ -84,8 +87,8 @@ landscape.dispose();
 // Mount again with a new canvas; the transfer cannot be undone.
 ```
 
-Without an application bundler, serve the emitted `dist/index.js` and its
-worker asset together over localhost HTTP or HTTPS. Importing the package is safe
+Without an application bundler, import `../dist/index.js` from an example module
+and serve the files over localhost HTTP or HTTPS. Importing the package is safe
 during server-side rendering: import alone starts no worker and requests no GPU
 resources. Device setup happens inside the render worker.
 
