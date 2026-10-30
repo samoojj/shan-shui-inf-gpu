@@ -131,22 +131,32 @@ fn boundaryFillCoverage(p: vec2f, offset: u32, count: u32) -> f32 {
 
 fn boundaryStrokeCoverage(p: vec2f, offset: u32, count: u32, radius: f32) -> f32 {
   let pixel = view.span / view.resolution;
-  var covered = 0.0;
-  for (var row = 0u; row < 4u; row++) {
-    for (var column = 0u; column < 4u; column++) {
-      let samplePoint = p + (vec2f(f32(column), f32(row)) * 0.25 - vec2f(0.375)) * pixel;
-      for (var i = 0u; i + 1u < count; i++) {
-        let a = points[offset + i];
-        let b = points[offset + i + 1u];
-        var inside = insideStrokeSegment(samplePoint, a, b, radius);
-        if (!inside && i > 0u && nearJoin(samplePoint, a, radius)) {
-          inside = joinDistance(samplePoint, previousDistinctPoint(offset, i, a), a, b, radius) <= 0.0;
+  var covered = 0u;
+  // Reject edges outside the whole sample footprint before testing its 16 points.
+  let margin = radius + max(pixel.x, pixel.y) * 0.375;
+  for (var i = 0u; i + 1u < count; i++) {
+    let a = points[offset + i];
+    let b = points[offset + i + 1u];
+    let segment = nearSegment(p, a, b, margin);
+    let join = i > 0u && nearJoin(p, a, radius);
+    if (!segment && !join) { continue; }
+    var previous = a;
+    if (join) { previous = previousDistinctPoint(offset, i, a); }
+    for (var row = 0u; row < 4u; row++) {
+      for (var column = 0u; column < 4u; column++) {
+        let bit = 1u << (row * 4u + column);
+        if ((covered & bit) != 0u) { continue; }
+        let samplePoint = p + (vec2f(f32(column), f32(row)) * 0.25 - vec2f(0.375)) * pixel;
+        var inside = segment && insideStrokeSegment(samplePoint, a, b, radius);
+        if (!inside && join && nearJoin(samplePoint, a, radius)) {
+          inside = joinDistance(samplePoint, previous, a, b, radius) <= 0.0;
         }
-        if (inside) { covered += 1.0; break; }
+        if (inside) { covered |= bit; }
       }
     }
+    if (covered == 65535u) { break; }
   }
-  return covered / 16.0;
+  return f32(countOneBits(covered)) / 16.0;
 }
 
 @vertex
