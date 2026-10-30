@@ -13,7 +13,7 @@ export interface GPUFailure {
 
 /** One device, canvas surface, and precompiled painting; no GPU handles escape. */
 export interface LandscapeProgram {
-  draw(options: Readonly<LandscapeOptions>): Promise<void>;
+  draw(options: Readonly<LandscapeOptions>, cancelled?: () => boolean): Promise<void>;
   /** Fence work already submitted; intentional disposal does not invalidate a bitmap snapshot. */
   finished(): Promise<void>;
   dispose(): void;
@@ -79,10 +79,11 @@ export async function createLandscapeProgram(
     let painting: Awaited<ReturnType<typeof generator.generate>> | undefined;
     let paintingStarted: number | undefined;
 
-    async function draw(options: Readonly<LandscapeOptions>) {
+    async function draw(options: Readonly<LandscapeOptions>, cancelled = () => false) {
       if (disposed) throw new Error("Landscape GPU program has been disposed.");
       if (failure) throw failure.error;
       const next = await generator.generate(options);
+      if (cancelled()) return;
       const changed = next !== painting;
       painting = next;
       ink.set({ jobs: next.jobs, points: next.points, bounds: next.bounds });
@@ -91,13 +92,35 @@ export async function createLandscapeProgram(
       layer.resize(size);
       ink.set({ view: { resolution: size, span: [options.width / options.zoom, options.height / options.zoom], offset: [options.cameraX, options.cameraY] } });
       composite.set({ paperView: { logicalSize: [options.width, options.height] } });
-      const viewKey = [size[0], size[1], options.width, options.height, options.zoom, options.cameraX, options.cameraY].join(":");
+      const viewKey = [size[0], size[1], options.width, options.height, options.zoom, options.cameraX, options.cameraY, options.presentation].join(":");
       const repaint = changed || paintedView !== viewKey;
       paintingStarted = performance.now();
-      frame(gpu, current => {
-        if (repaint) current.pass(layer, pass => pass.draw(ink, { instances: next.commandCount }));
-        current.pass(output, composite);
-      });
+      if (repaint && options.presentation === "incremental") {
+        // Preserve the attachment between ordered command batches. Clearing only
+        // the first batch makes its final pixels match the complete-mode pass.
+        paintedView = "";
+        const budget = options.commandsPerFrame;
+        for (let first = 0; first < Math.max(1, next.commandCount); first += budget) {
+          if (disposed || cancelled()) return;
+          frame(gpu, current => {
+            current.pass({ target: layer, clear: first === 0 }, pass => pass.draw(ink, {
+              firstInstance: first, instances: Math.min(budget, next.commandCount - first),
+            }));
+            current.pass(output, composite);
+          });
+          if (first + budget < next.commandCount) {
+            await fence();
+            // Yield for presentation and cancellation. Worker rAF may stop in
+            // hidden documents; a timer allows capture/completion to progress.
+            await new Promise<void>(resolve => setTimeout(resolve, 16));
+          }
+        }
+      } else {
+        frame(gpu, current => {
+          if (repaint) current.pass(layer, pass => pass.draw(ink, { instances: next.commandCount }));
+          current.pass(output, composite);
+        });
+      }
       paintedView = viewKey;
     }
 

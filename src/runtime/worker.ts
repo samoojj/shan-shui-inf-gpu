@@ -18,6 +18,7 @@ let active: "initialize" | "render" | "capture" | undefined;
 let disposing = false;
 let failed = false;
 let closed = false;
+let cancelledRevision = -1;
 
 function finishDisposal(): void {
   if (closed) return;
@@ -63,7 +64,7 @@ async function paint(message: Extract<WorkerRequest, { type: "render" | "capture
   if (!current || !canvas || disposing || failed) return;
   active = message.type;
   try {
-    await current.draw(message.options);
+    await current.draw(message.options, () => message.type === "render" && cancelledRevision === message.revision);
     if (message.type === "render") {
       await current.finished();
       if (!disposing && !failed) scope.postMessage({ type: "rendered", revision: message.revision });
@@ -113,6 +114,7 @@ scope.addEventListener("unhandledrejection", event => {
 scope.addEventListener("message", ({ data }) => {
   switch (data.type) {
     case "probe": void probe(); break;
+    case "cancel": cancelledRevision = data.revision; break;
     case "initialize":
       if (!active && !program && !disposing && !failed) void initialize(data);
       break;

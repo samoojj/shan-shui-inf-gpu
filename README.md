@@ -104,6 +104,8 @@ Reusing a retained canvas reference after cleanup cannot reverse its transfer.
 | `pixelRatio` | `1` | Backing resolution multiplier, `0.25`–`4`. |
 | `cameraX`, `cameraY` | `0`, `0` | Drawing-coordinate offset, within ±8192. Positive y points downward. |
 | `zoom` | `1.142` | Logical screen pixels per drawing unit, `0.25`–`4`. The visible extent is `width / zoom` by `height / zoom`. |
+| `presentation` | `"complete"` | `"complete"` or `"incremental"`, using authored brush order. |
+| `commandsPerFrame` | `256` | Positive integer brush budget for incremental frames. |
 
 `DEFAULT_OPTIONS` is exported with explicit dimensions of 1200 × 700. The visible
 width, `width / zoom`, must not exceed 8192 drawing units. Unknown options and
@@ -197,6 +199,33 @@ PNG encoding failure rejects that capture without making the renderer unusable.
 A GPU or worker failure is terminal and rejects pending work. Calls made after
 loss, failure, or disposal reject without applying their patches. Capture
 returns a PNG, not SVG or an editable scene description.
+
+## Incremental painting
+
+Choose `presentation: "complete"` (the default) to present the finished image,
+or `presentation: "incremental"` to paint ordered brush commands over multiple
+frames. `commandsPerFrame` controls pacing (default 256, integer 1–1,000,000):
+
+```ts
+const landscape = await createLandscape(canvas, {
+  seed: "1234", presentation: "incremental", commandsPerFrame: 128,
+});
+await landscape.render({ cameraX: 300 });
+```
+
+Construction finishes before presentation starts. Each batch loads the ink
+already painted, adds the next commands in authored painter order, and presents
+the result. Both modes finish with identical pixels on the same adapter.
+Creation and `render()` resolve after the entire sequence finishes. An unchanged
+view reuses completed ink rather than replaying the sequence.
+
+A newer render supersedes an active incremental render when no capture barrier
+is queued; superseded callers resolve when the replacement finishes. Each new
+view starts with a cleared ink target so revisions do not mix. `capture()` waits
+for preceding work and captures its own **complete** frame; it does not snapshot
+a partial sequence. Disposal stops rendering, while an already-dispatched
+capture retains its completion guarantee. The initialization abort signal stops
+creation even while the first incremental sequence is running.
 
 ## Fidelity, determinism, and execution
 
