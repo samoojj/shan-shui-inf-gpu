@@ -6,6 +6,9 @@ import { gpuFixtures } from './gpu/fixtures.mjs';
 import { checkCoordinates } from './gpu/coordinates.mjs';
 import { checkNoise } from './gpu/noise.mjs';
 import { checkRaster } from './gpu/raster.mjs';
+import { checkConstruction } from './gpu/construction.mjs';
+import { checkTerrain } from './gpu/terrain.mjs';
+import { checkPlanning } from './gpu/planning.mjs';
 
 const directory = new URL('../test-results/gpu-primitives/', import.meta.url);
 await rm(directory, { recursive: true, force: true });
@@ -26,6 +29,9 @@ try {
     noise: await checkNoise(gpu, fixture),
     coordinates: await checkCoordinates(gpu, fixture, packDrawing),
     raster: await checkRaster(gpu, packDrawing, directory),
+    construction: await checkConstruction(gpu),
+    terrain: await checkTerrain(gpu),
+    planning: await checkPlanning(gpu),
   };
   await gpu.settled();
   assert.deepEqual(errors, [], 'Native GPU errors were reported');

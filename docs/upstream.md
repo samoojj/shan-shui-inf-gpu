@@ -7,6 +7,7 @@ Copyright 2018 Lingdong Huang; attribution remains in [LICENSE](../LICENSE).
 Construction studies available at this stage:
 
 - [Brush primitives](original-primitives.md)
+- [Terrain and planning](original-landscape.md)
 
 GPU chunks and objects use independent random streams. An equal text seed does
 not reproduce the old CPU composition. Same-adapter repeatability does not
