@@ -110,10 +110,9 @@ export async function createLandscapeProgram(
             current.pass(output, composite);
           });
           if (first + budget < next.commandCount) {
-            await fence();
-            // Yield for presentation and cancellation. Worker rAF may stop in
-            // hidden documents; a timer allows capture/completion to progress.
-            await new Promise<void>(resolve => setTimeout(resolve, 16));
+            // Pace from submission while waiting for GPU completion. Both must
+            // finish before the next batch; timers also progress in hidden tabs.
+            await Promise.all([fence(), new Promise<void>(resolve => setTimeout(resolve, 16))]);
           }
         }
       } else {
