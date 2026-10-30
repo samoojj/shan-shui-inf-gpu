@@ -3,13 +3,14 @@ import { runScenario } from './browser/fixture.mjs';
 import { renderingScenarios } from './browser/rendering.mjs';
 import { lifecycleScenarios } from './browser/lifecycle.mjs';
 import { captureScenarios } from './browser/capture.mjs';
+import { incrementalScenarios } from './browser/incremental.mjs';
 import { initializationScenarios } from './browser/initialization.mjs';
 
 // Native WebGPU correctness checks. SwiftShader results are not hardware benchmarks.
 // API fixtures preserve a 320×256 logical view at pixelRatio 0.25 (80×64 pixels),
 // with separate overlap/resize cases. Demo DPR is 0.25; full-size original-image
 // comparisons run separately so software testing does not repaint huge scenes.
-const scenarios = [...renderingScenarios, ...lifecycleScenarios, ...captureScenarios, ...initializationScenarios];
+const scenarios = [...renderingScenarios, ...lifecycleScenarios, ...captureScenarios, ...incrementalScenarios, ...initializationScenarios];
 const selected = process.env.BROWSER_TEST_FILTER
   ? scenarios.filter(scenario => scenario.name.includes(process.env.BROWSER_TEST_FILTER))
   : scenarios;

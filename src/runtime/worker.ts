@@ -18,6 +18,7 @@ let active: "initialize" | "render" | "capture" | undefined;
 let disposing = false;
 let failed = false;
 let closed = false;
+let cancelledRevision = -1;
 
 function finishDisposal(): void {
   if (closed) return;
@@ -63,7 +64,10 @@ async function paint(message: Extract<WorkerRequest, { type: "render" | "capture
   if (!current || !canvas || disposing || failed) return;
   active = message.type;
   try {
-    await current.draw(message.options);
+    // Captures require a complete frame, not animation delays that can exhaust
+    // the graceful-disposal deadline before encoding has even started.
+    const paintingOptions = message.type === "capture" ? { ...message.options, presentation: "complete" as const } : message.options;
+    await current.draw(paintingOptions, () => message.type === "render" && cancelledRevision === message.revision);
     if (message.type === "render") {
       await current.finished();
       if (!disposing && !failed) scope.postMessage({ type: "rendered", revision: message.revision });
@@ -113,6 +117,7 @@ scope.addEventListener("unhandledrejection", event => {
 scope.addEventListener("message", ({ data }) => {
   switch (data.type) {
     case "probe": void probe(); break;
+    case "cancel": cancelledRevision = data.revision; break;
     case "initialize":
       if (!active && !program && !disposing && !failed) void initialize(data);
       break;

@@ -33,8 +33,17 @@ test('invalid and obsolete style options are rejected before scene or GPU alloca
     { cameraY: -8193 }, { zoom: 0.249 }, { zoom: 4.01 }, { width: 3000, zoom: .25 },
     { layers: 4 }, { roughness: .5 }, { inkDensity: .5 }, { mist: .5 },
     { vegetation: .5 }, { water: .5 }, { paper: [1, 1, 1] }, { ink: [0, 0, 0] },
+    { presentation: 'tiles' }, { commandsPerFrame: 0 }, { commandsPerFrame: 1.5 },
   ];
   for (const patch of invalid) assert.throws(() => resolveOptions(patch), undefined, JSON.stringify(patch));
+});
+
+test('incremental presentation is explicit and pacing updates preserve scene identity', () => {
+  assert.equal(DEFAULT_OPTIONS.presentation, 'complete');
+  const options = resolveOptions({ presentation: 'incremental', commandsPerFrame: 32 });
+  assert.equal(options.seed, DEFAULT_OPTIONS.seed);
+  assert.equal(options.commandsPerFrame, 32);
+  assert.equal(resolveOptions({ cameraX: 20 }, options).presentation, 'incremental');
 });
 
 test('documented option boundaries and URL-encoded seeds are accepted', () => {

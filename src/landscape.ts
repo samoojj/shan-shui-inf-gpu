@@ -192,12 +192,19 @@ export async function createLandscape(canvas: LandscapeCanvas, patch: Partial<La
     const candidate = resolveOptions(patch, options);
     const result = deferred<void>();
     options = candidate;
+    // A capture already in the queue is an exact barrier: finish its preceding
+    // painting. Otherwise move superseded callers onto the replacement frame.
+    const superseded = active?.type === "render" && active.options.presentation === "incremental"
+      && !queue.some(job => job.type === "capture") ? active : undefined;
+    const waiters = superseded ? superseded.waiters.splice(0) : [];
+    waiters.push(result);
     const previous = queue[queue.length - 1];
     if (previous?.type === "render") {
       previous.options = candidate;
       previous.revision = ++revision;
-      previous.waiters.push(result);
-    } else queue.push({ type: "render", revision: ++revision, options: candidate, waiters: [result] });
+      previous.waiters.push(...waiters);
+    } else queue.push({ type: "render", revision: ++revision, options: candidate, waiters });
+    if (superseded) post({ type: "cancel", revision: superseded.revision });
     schedule();
     return result.promise;
   }
