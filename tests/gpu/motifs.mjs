@@ -96,6 +96,14 @@ export async function checkMotifs(gpu) {
   try {
     for (const [kind, entryName] of entries.entries()) {
       const cases = fixtures.cases.filter(fixture => fixture.request.kind === kind);
+      const standing = cases.find(fixture => fixture.label === 'standing-person');
+      if (standing) {
+        // Reflect the frozen CPU capture to check the hat tip in both facings.
+        cases.push({ ...standing, label: 'mirrored-standing-person',
+          request: { ...standing.request, flags: standing.request.flags ^ 1 },
+          paths: standing.paths.map(path => path.map(([x, y]) => [2 * standing.request.origin[0] - x, y])),
+        });
+      }
       const packed = requestBuffer(cases);
       const requests = storage(gpu, packed.byteLength, 'read');
       requests.write(packed);
