@@ -1,6 +1,6 @@
-# Verification at stack stage 3/8
+# Verification at stack stage 4/8
 
-This branch introduces **Port all eight tree constructions with independent geometry acceptance**. The original SVG demo remains
+This branch introduces **Construct architecture, figures, boats and water on the GPU**. The original SVG demo remains
 available from the repository root until the final migration.
 
 ```sh
@@ -22,6 +22,7 @@ Coverage available in this branch:
 - nine CPU terrain constructions, 96 independent island layouts, overflow checks.
 - neighbor-aware planning, seed 1 regression, repeated and overlapping ranges.
 - all eight trees, command/control overflow, original references and 775 controlled CPU commands.
+- 13 independent motif constructions and three intentional overflow cases.
 
 Artifacts are written under `test-results/gpu-primitives/`. Coordinate tolerances
 and comparison details are reported by each independent probe. Expected CPU
