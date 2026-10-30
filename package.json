@@ -1,0 +1,33 @@
+{
+  "name": "shan-shui-gpu",
+  "version": "0.1.0",
+  "description": "Procedural ink landscapes with GPU construction, WebGPU rendering and a worker-owned canvas.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/samoojj/shan-shui-inf-gpu.git"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check:shaders": "node scripts/check-shaders.mjs",
+    "test:gpu": "node tests/gpu-primitives.mjs",
+    "test": "npm run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@vgpu/wgsl": "0.6.0",
+    "@webgpu/types": "0.1.74",
+    "esbuild": "0.28.2",
+    "typescript": "^5.9.3",
+    "pngjs": "7.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "vgpu": "0.6.0"
+  },
+  "private": true
+}
