@@ -9,9 +9,9 @@ Some examples:
 {Shan, Shui}\* is inspired by [traditional Chinese landscape scrolls](https://en.wikipedia.org/wiki/Shan_shui) (such as [this](https://en.wikipedia.org/wiki/Dwelling_in_the_Fuchun_Mountains) and [this](https://en.wikipedia.org/wiki/Wang_Ximeng)) and uses noises and mathematical functions to model the mountains and trees from scratch. It is written entirely in javascript and outputs Scalable Vector Graphics (SVG) format.
 
 
-## GPU port review stack: 1/8
+## GPU port review stack: 2/8
 
-**Establish GPU construction and painting primitives.** The original application above remains the default demo
+**Construct terrain and plan neighbor-aware world chunks.** The original application above remains the default demo
 while the GPU library is assembled in reviewable stages.
 
 Run `npm ci`, `npm test`, `npm run check:shaders`, and `npm run test:gpu`.
