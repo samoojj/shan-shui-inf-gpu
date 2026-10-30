@@ -22,6 +22,27 @@ async function beginIncremental(page, patch = {}) {
 
 export const incrementalScenarios = [
   {
+    name: 'incremental capture with a one-command budget survives immediate disposal',
+    async run({ page }) {
+      await page.evaluate(async () => {
+        const t = window.test;
+        const expected = t.hash((await t.decodePNG((await t.renderer.capture({ cameraY: 180 })).blob)).pixels);
+        await t.renderer.render({ cameraY: 160 });
+        const capture = t.renderer.capture({ presentation: 'incremental', commandsPerFrame: 1, cameraY: 180 });
+        t.renderer.dispose();
+        let timer;
+        try {
+          const image = await Promise.race([capture, new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Capture retained incremental pacing')), 10000);
+          })]);
+          t.require(image.options.presentation === 'incremental' && image.options.commandsPerFrame === 1, 'Capture lost request metadata');
+          t.require(t.hash((await t.decodePNG(image.blob)).pixels) === expected, 'Disposed capture lost complete pixels');
+          await t.harness.terminated();
+        } finally { clearTimeout(timer); }
+      });
+    },
+  },
+  {
     name: 'incremental batches preserve painter order and finish with complete-mode pixels',
     async run({ page }) {
       await beginIncremental(page, { cameraY: 160 });
