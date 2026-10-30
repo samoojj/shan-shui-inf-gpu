@@ -183,7 +183,7 @@ among rocks and architecture in a larger drawing sequence. See
 [L2234–2349][flatdec]. Moving trees onto an unrelated periodic field loses both
 these associations and the foreground/background distribution.
 
-The current [execution boundary](verification.md) retains these
+The current [execution boundary](architecture.md#the-cpugpu-seam) retains these
 constructions. [Verification](verification.md) separates exact command/state
 regressions from GPU coordinate and image tolerances.
 

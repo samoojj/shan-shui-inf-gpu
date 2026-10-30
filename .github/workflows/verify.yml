@@ -32,3 +32,19 @@ jobs:
           path: |
             test-results/gpu-primitives
             test-results/visual-corpus
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+        env:
+          SWIFTSHADER: 1
+      - run: npm run test:consumer
+        env:
+          SWIFTSHADER: 1

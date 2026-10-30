@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DEFAULT_OPTIONS, bufferSize, resolveOptions } from '../dist/options.js';
 
+test('package imports without browser globals and reports unsupported WebGPU in Node', async () => {
+  const { createLandscape, isWebGPUSupported } = await import('../dist/index.js');
+  assert.equal(typeof createLandscape, 'function');
+  assert.equal(await isWebGPUSupported(), false);
+  await assert.rejects(createLandscape(null), /canvas/i);
+});
+
 test('partial updates preserve the original viewer settings without mutating prior options', () => {
   const previous = resolveOptions({ seed: 'retained', width: 960, zoom: 2 });
   const patch = { cameraX: -100 };
