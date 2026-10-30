@@ -60,6 +60,9 @@ export const incrementalScenarios = [
   {
     name: 'incremental batches preserve painter order and finish with complete-mode pixels',
     async run({ page }) {
+      // A mode-only update reuses completed ink. Change the view first so the
+      // return to the initial view exercises an actual incremental repaint.
+      await page.evaluate(() => window.test.renderer.render({ cameraY: 180 }));
       await beginIncremental(page, { cameraY: 160 });
       await page.evaluate(async () => {
         const t = window.test, held = await t.inspect();
