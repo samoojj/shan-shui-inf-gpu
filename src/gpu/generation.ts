@@ -123,6 +123,10 @@ export async function createGenerator(gpu: Gpu) {
     const constructionStarted = performance.now();
     if (current) { release(current.jobs); release(current.points); release(current.bounds); current = undefined; }
     const scratch: GPUBuffer[] = [];
+    const pendingPainting: GPUBuffer[] = [];
+    const paintingBuffer = (label: string, bytes: number) => {
+      const buffer = allocate(label, bytes); pendingPainting.push(buffer); return buffer;
+    };
     const temporary = (label: string, bytes: number) => {
       const buffer = allocate(label, bytes); scratch.push(buffer); return buffer;
     };
@@ -165,19 +169,23 @@ export async function createGenerator(gpu: Gpu) {
       pipelines.count.set({ objects, parentCounts, childCounts, parentJobs, offsets, summary });
       dispatch(pipelines.count, 1);
       const [commandCount, pointCount] = await allocationCounts("decoration");
-      const jobs = allocate("ordered GPU brushes", Math.max(1, commandCount) * BRUSH_BYTES);
-      const points = allocate("GPU brush vertices", pointCount * 8);
-      const bounds = allocate("GPU brush bounds", commandCount * 16);
+      const jobs = paintingBuffer("ordered GPU brushes", Math.max(1, commandCount) * BRUSH_BYTES);
+      const points = paintingBuffer("GPU brush vertices", pointCount * 8);
+      const bounds = paintingBuffer("GPU brush bounds", commandCount * 16);
       pipelines.compact.set({ objects, children, parentCounts, childCounts, parentJobs, childJobs, offsets, jobs });
       pipelines.brushes.set({ jobs, inputData, noiseTable, points, bounds });
       dispatch(pipelines.compact, parentCount);
       dispatch(pipelines.brushes, Math.ceil(commandCount / 64));
       await gpu.settled();
       current = { jobs, points, bounds, commandCount }; currentKey = key;
+      pendingPainting.length = 0; // Ownership transfers only after construction succeeds.
       performance.clearMeasures("landscape:construction");
       performance.measure("landscape:construction", { start: constructionStarted, end: performance.now() });
       return current;
-    } finally { for (const buffer of scratch) release(buffer); }
+    } finally {
+      for (const buffer of pendingPainting) release(buffer);
+      for (const buffer of scratch) release(buffer);
+    }
   }
   return { generate, noiseTable, paperRandom, dispose };
 }
