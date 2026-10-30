@@ -417,10 +417,9 @@ fn clothing(writer: ptr<function, Writer>, joints: Path, origin: vec2f, scale: f
 // transform always mirrors x once and mirrors it a second time when flipped.
 fn attachedPoint(first: vec2f, last: vec2f, position: vec2f, flipped: bool) -> vec2f {
   let local = vec2f(select(-position.x, position.x, flipped), position.y);
-  let angle = atan2(last.y - first.y, last.x - first.x) - PI * 0.5;
-  let radius = length(local) * distance(first, last);
-  let localAngle = atan2(local.y, local.x);
-  return first + radius * vec2f(cos(angle + localAngle), sin(angle + localAngle));
+  let axis = last - first;
+  // Align local y with the anchors without polar angles or signed-zero atan2.
+  return first + local.x * vec2f(axis.y, -axis.x) + local.y * axis;
 }
 
 const STANDING_HAT: array<vec2f, 7> = array<vec2f, 7>(
