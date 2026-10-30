@@ -22,6 +22,21 @@ async function beginIncremental(page, patch = {}) {
 
 export const incrementalScenarios = [
   {
+    name: 'incremental completed ink survives capture and unchanged renders',
+    async run({ page }) {
+      await page.evaluate(async () => {
+        const t = window.test;
+        await t.renderer.render({ presentation: 'incremental', commandsPerFrame: 128, cameraY: 180 });
+        const before = (await t.inspect()).draws.length;
+        const image = await t.renderer.capture();
+        await t.renderer.render();
+        const added = (await t.inspect()).draws.slice(before);
+        t.require(!added.some(draw => draw[0] === 6), 'Capture or unchanged render repainted completed ink');
+        t.require(image.options.presentation === 'incremental', 'Capture changed requested presentation');
+      });
+    },
+  },
+  {
     name: 'incremental capture with a one-command budget survives immediate disposal',
     async run({ page }) {
       await page.evaluate(async () => {
