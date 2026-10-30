@@ -1,6 +1,6 @@
-# Verification at stack stage 4/8
+# Verification at stack stage 5/8
 
-This branch introduces **Construct architecture, figures, boats and water on the GPU**. The original SVG demo remains
+This branch introduces **Assemble complete GPU scenes with bounded allocation**. The original SVG demo remains
 available from the repository root until the final migration.
 
 ```sh
@@ -9,6 +9,7 @@ npm test
 npx vgpu install-software-renderer
 VGPU_ADAPTER=software npm run check:shaders
 VGPU_ADAPTER=software npm run test:gpu
+VGPU_ADAPTER=software npm run test:visual
 ```
 
 Native checks require an available adapter and fail when none exists. Software

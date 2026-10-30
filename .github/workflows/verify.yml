@@ -22,9 +22,13 @@ jobs:
       - run: npm run test:gpu
         env:
           VGPU_ADAPTER: software
+      - run: npm run test:visual
+        env:
+          VGPU_ADAPTER: software
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: native-acceptance
           path: |
             test-results/gpu-primitives
+            test-results/visual-corpus
